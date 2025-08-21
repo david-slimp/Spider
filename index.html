@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Spider</title>
+  <style>
+    :root{
+      --bg1:#0b1220; --bg2:#102338; --feather:#0ea5e9; --accent:#22d3ee; --accent2:#7c3aed; --ok:#22c55e; --warn:#f59e0b; --muted:#9fb2c7; --text:#e6eef7;
+      --panel:rgba(13,22,37,.6); --border:rgba(255,255,255,.14); --shadow:0 20px 50px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:
+      radial-gradient(900px 600px at 10% 0%, rgba(124,58,237,.12), transparent 60%),
+      radial-gradient(900px 600px at 90% 100%, rgba(14,165,233,.12), transparent 60%),
+      linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      overflow:hidden;
+    }
+    #hud{position:fixed;left:16px;right:16px;top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;z-index:10}
+    .card{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:8px 10px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+    button,select,input[type="text"]{appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);padding:9px 12px;border-radius:12px;font-weight:600;cursor:pointer}
+    button:hover{transform:translateY(-1px)}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .pill{padding:6px 10px;border-radius:999px;border:1px dashed var(--border);font-size:12px;color:var(--muted)}
+    #status{position:fixed;left:16px;right:16px;bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:10}
+    #game{position:fixed;inset:0}
+    .kbd{padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.06);font-size:12px}
+    .win{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:20}
+    .win .modal{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:24px;min-width:340px;text-align:center;backdrop-filter:blur(10px)}
+    .row{display:flex;gap:10px;justify-content:center;margin-top:14px}
+    .seedbox{width:160px}
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div class="card" style="gap:8px">
+      <button id="newBtn" title="N">New</button>
+      <button id="replayBtn" title="Replay seed">Replay</button>
+      <button id="undoBtn" title="U">Undo</button>
+      <button id="redoBtn" title="R">Redo</button>
+      <button id="hintBtn" title="H">Hint</button>
+      <button id="dealBtn" title="D">Deal</button> <span id="dealReason" class="pill" style="display:none"></span>
+      <select id="difficulty">
+        <option value="1-suit" selected>1-suit</option>
+        <option value="2-suit">2-suit</option>
+        <option value="4-suit">4-suit</option>
+      </select>
+      <input id="seedInput" class="seedbox" type="text" placeholder="custom seed"/>
+      <button id="setSeedBtn">Set Seed</button>
+      <button id="muteBtn">🔊</button>
+      <button id="verifyBtn" title="Check deck & invariants">Verify</button>
+    </div>
+    <div class="card">
+      <div>Time: <span id="time">0:00</span></div>
+      <div>Moves: <span id="moves">0</span></div>
+      <div>Score: <span id="score">500</span></div>
+      <div>Deals: <span id="deals">5</span></div>
+      <div class="pill">Seed: <span id="seedLabel"></span></div>
+    </div>
+    <div class="card" style="gap:6px">
+      <span class="kbd">N</span>
+      <span class="kbd">D</span>
+      <span class="kbd">U / R</span>
+      <span class="kbd">H</span>
+    </div>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <div id="status"><span class="pill" id="msg"></span></div>
+
+  <div id="winModal" class="win">
+    <div class="modal">
+      <h2 style="margin:0 0 8px 0">🦚 You Win!</h2>
+      <div>Time <b id="winTime">0:00</b> · Moves <b id="winMoves">0</b> · Score <b id="winScore">0</b></div>
+      <div class="row">
+        <button id="playAgain">Play again</button>
+        <button id="shareSeed">Copy share link</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // =============================
+    // Spider Solitaire v 0.0.1  / single file
+    // Built to the PRD (seeded RNG, strict rules, K→A same-suit completion, hints, undo/redo)
+    // =============================
+    const $ = (id)=>document.getElementById(id);
+    const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+    const now = ()=>performance.now();
+    const RED = new Set(['♥','♦']);
+
+    // ---------- PRNG ----------
+    function mulberry32(a){ return function(){ let t=a+=0x6D2B79F5; t=Math.imul(t ^ t>>>15, t|1); t^=t+Math.imul(t ^ t>>>7, t|61); return ((t ^ t>>>14)>>>0)/4294967296; } }
+    function hashSeed(str){ let h=2166136261>>>0; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+    function shuffle(arr, rnd){ for(let i=arr.length-1;i>0;i--){ const j=(rnd()*(i+1))|0; [arr[i],arr[j]]=[arr[j],arr[i]]; } }
+    const randSeed = ()=>{ const a=new Uint32Array(2); crypto.getRandomValues(a); return (a[0].toString(36)+a[1].toString(36)).slice(0,10); };
+
+    // ---------- Sounds (WebAudio) ----------
+    const AudioKit = (()=>{ const ctx = new (window.AudioContext||window.webkitAudioContext)(); let muted=false; function blip(freq=880,len=0.06,type='triangle',gain=0.05){ if(muted) return; const o=ctx.createOscillator(); const g=ctx.createGain(); o.type=type; o.frequency.value=freq; o.connect(g); g.connect(ctx.destination); g.gain.value=gain; o.start(); g.gain.setValueAtTime(gain, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+len); o.stop(ctx.currentTime+len); }
+      function chord(){ if(muted) return; [523,659,784,988].forEach((f,i)=>setTimeout(()=>blip(f,0.16,'sine',0.06), i*70)); }
+      return { blip, chord, setMuted(v){muted=v}, isMuted(){return muted}, resume(){ctx.resume?.()} };
+    })();
+
+    // ---------- Engine State ----------
+    const SUITS=['♠','♥','♦','♣'];
+    const state = {
+      difficulty:'1-suit', seed:'', rng:null,
+      tableau:[], stock:[], dealsRemaining:5, foundations:0,
+      moves:0, score:500, startTime:0, elapsedMs:0, running:true,
+      history:[], redo:[], message:'', hint:null, won:false, foundationsCards:[]
+    };
+
+    function createDeck(difficulty){
+      let suits;
+      if(difficulty==='1-suit') suits=Array(8).fill('♠');
+      else if(difficulty==='2-suit') suits=[...Array(4).fill('♠'), ...Array(4).fill('♥')];
+      else suits=['♠','♥','♦','♣','♠','♥','♦','♣'];
+      const deck=[]; let id=0; for(const s of suits){ for(let r=1;r<=13;r++){ deck.push({id:id++, suit:s, rank:r, faceUp:false}); } }
+      return deck; // 104
+    }
+
+    function initialDeal(deck){ const cols=Array.from({length:10},()=>[]); let idx=0; for(let pass=0;pass<6;pass++){ for(let c=0;c<10;c++){ if(pass===5 && c>=4) continue; const card=deck[idx++]; cols[c].push(card); } } for(let c=0;c<10;c++){ cols[c][cols[c].length-1].faceUp=true; } const stock=deck.slice(idx); return {tableau:cols, stock}; }
+
+    const top = (col)=>col[col.length-1];
+
+    function canDrop(tailHead, destTop){ if(!destTop) return true; return tailHead.rank+1===destTop.rank; }
+
+    function tryComplete(col){ if(col.length<13) return null; const L=col.length; const suit=col[L-1].suit; for(let i=0;i<13;i++){ const card=col[L-1-i]; if(!(card.faceUp && card.suit===suit && card.rank===(1+i))) return null; } return col.splice(L-13,13);
+    }
+
+    function removeFromFoundations(cards){
+      const set = new Set(cards.map(c=>c.id));
+      state.foundationsCards = state.foundationsCards.filter(c=>!set.has(c.id));
+    }
+
+    function completeTopRun(colIndex){
+      const col = state.tableau[colIndex];
+      const rem = tryComplete(col);
+      if(!rem) return false;
+      let turned = null;
+      if(col.length && !top(col).faceUp){
+        top(col).faceUp = true;
+        turned = top(col);
+      }
+      state.foundationsCards.push(...rem);
+      state.foundations++;
+      state.history.push({t:'complete', col:colIndex, cards:rem, turned});
+      state.score += 100;
+      AudioKit.blip(1000,0.08,'sine',0.06);
+      return true;
+    }
+
+    // ---------- Game actions ----------
+    function newGame({difficulty=state.difficulty, seed=randSeed(), custom=false}={}){
+      state.difficulty=difficulty; state.seed=seed; state.rng=mulberry32(hashSeed(difficulty+':'+seed));
+      const deck=createDeck(difficulty); shuffle(deck, state.rng);
+      const deal=initialDeal(deck);
+      state.tableau=deal.tableau; state.stock=deal.stock; state.dealsRemaining=5; state.foundations=0;
+      state.moves=0; state.score=500; state.history=[]; state.redo=[]; state.message=''; state.hint=null; state.won=false;
+      state.startTime=now(); state.elapsedMs=0; state.running=true; updateUI(); draw();
+      saveGame();
+    }
+
+    function dealRow(){ if(state.dealsRemaining<=0){ flashMsg('No deals left'); return false; } for(let c=0;c<10;c++){ if(state.tableau[c].length===0){ flashMsg('Fill empty columns before dealing'); return false; } }
+      const dealt=[]; for(let c=0;c<10;c++){ const card=state.stock.shift(); card.faceUp=true; state.tableau[c].push(card); dealt.push(card); }
+      state.dealsRemaining--; state.history.push({t:'deal', dealt}); state.redo=[]; state.moves++; state.score=Math.max(0,state.score-1); AudioKit.blip(420,0.05);
+      // post-deal completion on each column
+      for(let c=0;c<10;c++){ completeTopRun(c); }
+      checkWin(); updateUI(); draw(); saveGame(); return true; }
+
+    function doMove(from, startIndex, to){ if(from===to) return false; const src=state.tableau[from], dst=state.tableau[to]; const n=src.length; if(startIndex<0||startIndex>=n) return false; // validate same-suit descending from startIndex..end
+      for(let i=n-1;i>startIndex;i--){ const a=src[i], b=src[i-1]; if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ bounce(); flashMsg('Select a same-suit descending tail'); return false; } }
+      const moved=src.slice(startIndex); if(!canDrop(moved[0], top(dst))){ bounce(); flashMsg('Illegal move'); return false; }
+      dst.push(...moved); src.length=startIndex; let turned=null; if(src.length && !top(src).faceUp){ top(src).faceUp=true; turned=top(src); }
+      state.history.push({t:'move', from, to, moved:structuredClone(moved), turned}); state.redo=[]; state.moves++; state.score=Math.max(0,state.score-1); AudioKit.blip(700,0.05,'triangle',0.045);
+      // try completes on both piles
+      completeTopRun(to);
+      completeTopRun(from);
+      checkWin(); updateUI(); draw(); saveGame(); return true; }
+
+    function undo(){ const h=state.history.pop(); if(!h) return; if(h.t==='complete'){ const col=state.tableau[h.col]; col.push(...h.cards); if(h.turned){ const idx=col.findIndex(c=>c.id===h.turned.id); if(idx>=0) col[idx].faceUp=false; } removeFromFoundations(h.cards); state.foundations--; state.redo.push(h); }
+      else if(h.t==='move'){ const colFrom=state.tableau[h.from], colTo=state.tableau[h.to]; const k=h.moved.length; colTo.splice(colTo.length-k,k); colFrom.push(...h.moved); if(h.turned){ const idx=colFrom.findIndex(c=>c.id===h.turned.id); if(idx>=0) colFrom[idx].faceUp=false; } state.redo.push(h); }
+      else if(h.t==='deal'){ for(let i=9;i>=0;i--){ const card=state.tableau[i].pop(); card.faceUp=false; state.stock.unshift(card); } state.dealsRemaining++; state.redo.push(h); }
+      state.moves++; draw(); updateUI(); saveGame(); }
+
+    function redo(){ const h=state.redo.pop(); if(!h) return; if(h.t==='complete'){ const col=state.tableau[h.col]; col.splice(col.length-13,13); if(h.turned){ const idx=col.findIndex(c=>c.id===h.turned.id); if(idx>=0) col[idx].faceUp=true; } state.foundationsCards.push(...h.cards); state.foundations++; state.history.push(h); }
+      else if(h.t==='move'){ const colFrom=state.tableau[h.from], colTo=state.tableau[h.to]; colFrom.splice(colFrom.length-h.moved.length, h.moved.length); colTo.push(...h.moved); if(h.turned){ const idx=colFrom.findIndex(c=>c.id===h.turned.id); if(idx>=0) colFrom[idx].faceUp=true; } state.history.push(h); }
+      else if(h.t==='deal'){ for(let c=0;c<10;c++){ const card=state.stock.shift(); card.faceUp=true; state.tableau[c].push(card); } state.dealsRemaining--; state.history.push(h); }
+      state.moves++; draw(); updateUI(); saveGame(); }
+
+    function checkWin(){ if(state.foundations===8){ state.won=true; state.running=false; AudioKit.chord(); showWin(); } }
+
+    // ---------- Persistence ----------
+    const STORAGE_KEY='spider.v2.lastGame';
+    function saveGame(){
+      try{
+        const payload={
+          d:state.difficulty, s:state.seed, deals:state.dealsRemaining, f:state.foundations, m:state.moves, sc:state.score, t:state.elapsedMs,
+          tab:state.tableau.map(col=>col.map(c=>({id:c.id,s:c.suit,r:c.rank,u:c.faceUp}))),
+          stock:state.stock.map(c=>({id:c.id,s:c.suit,r:c.rank,u:c.faceUp})),
+          fd:state.foundationsCards.map(c=>({id:c.id,s:c.suit,r:c.rank,u:c.faceUp}))
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      }catch{}
+    }
+    function loadGame(){
+      try{
+        const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return false; const p=JSON.parse(raw);
+        state.difficulty=p.d; state.seed=p.s; state.rng=mulberry32(hashSeed(state.difficulty+':'+state.seed));
+        state.dealsRemaining=p.deals; state.foundations=p.f; state.moves=p.m; state.score=p.sc; state.elapsedMs=p.t; state.running=true; state.won=false; state.history=[]; state.redo=[];
+        state.tableau=p.tab.map(col=>col.map(o=>({id:o.id,suit:o.s,rank:o.r,faceUp:o.u})));
+        state.stock=p.stock.map(o=>({id:o.id,suit:o.s,rank:o.r,faceUp:o.u}));
+        state.foundationsCards=(p.fd||[]).map(o=>({id:o.id,suit:o.s,rank:o.r,faceUp:o.u}));
+        updateUI(); draw(); return true;
+      }catch{ return false; }
+    }
+    // ---------- Rendering ----------
+    const canvas=$('game'); const ctx=canvas.getContext('2d'); let W=0,H=0, cardW=96, cardH=134, gap=14, margin=26, topArea=160, overlapUp=26, overlapDown=32;
+
+    function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; W=canvas.width; H=canvas.height; const availW=W - margin*2 - gap*9; cardW=clamp(Math.floor(availW/10), 68, 116); cardH=Math.floor(cardW*1.4); topArea=Math.max(150, cardH+40); overlapUp=Math.floor(cardH*0.24); overlapDown=Math.floor(cardH*0.30); draw(); }
+    window.addEventListener('resize', resize);
+
+    const colX = (i)=> margin + i*(cardW+gap);
+    const pileY = ()=> margin + 20;
+
+    function drawRounded(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+    function drawPeacockGlass(x,y,w,h){ // background motif
+      const g=ctx.createLinearGradient(x,y,x+w,y+h); g.addColorStop(0,'rgba(34,211,238,.12)'); g.addColorStop(1,'rgba(124,58,237,.12)'); ctx.fillStyle=g; ctx.fillRect(x,y,w,h);
+      ctx.globalAlpha=.18; ctx.strokeStyle='rgba(14,165,233,.6)'; for(let i=0;i<8;i++){ ctx.beginPath(); const cx=x+w/2, cy=y+h/2; const r=w*0.5*(1-i/8); ctx.ellipse(cx, cy, r, r*0.55, 0, 0, Math.PI*2); ctx.stroke(); } ctx.globalAlpha=1;
+    }
+
+    function drawCard(x,y,card){ const r=12; ctx.save(); ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=12; ctx.shadowOffsetY=8; if(card.faceUp){ drawRounded(x,y,cardW,cardH,r); ctx.fillStyle='rgba(17,24,39,.85)'; ctx.fill(); const grad=ctx.createLinearGradient(x,y,x,y+cardH); grad.addColorStop(0,'rgba(255,255,255,.12)'); grad.addColorStop(1,'rgba(255,255,255,.02)'); ctx.fillStyle=grad; ctx.fill(); ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.stroke(); // feather corner
+        ctx.save(); ctx.globalAlpha=.25; drawPeacockGlass(x+6,y+6,cardW-12,cardH-12); ctx.restore();
+        // Rank + suit
+        ctx.font=`bold ${Math.floor(cardW*0.24)}px system-ui`; ctx.textBaseline='top'; ctx.fillStyle = RED.has(card.suit)?'#fca5a5':'#e5e7eb'; const rankStr=['A','2','3','4','5','6','7','8','9','10','J','Q','K'][card.rank-1]; ctx.fillText(rankStr, x+10, y+8); ctx.font=`bold ${Math.floor(cardW*0.28)}px system-ui`; ctx.textBaseline='alphabetic'; ctx.fillText(card.suit, x+cardW- Math.floor(cardW*0.28) - 8, y+cardH-12);
+      } else { drawRounded(x,y,cardW,cardH,r); const g=ctx.createLinearGradient(x,y,x+cardW,y+cardH); g.addColorStop(0,'#1f2937'); g.addColorStop(1,'#0b1220'); ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke(); ctx.save(); ctx.clip(); ctx.globalAlpha=.22; // feather stripes
+        for(let i=0;i<cardW;i+=8){ ctx.fillStyle=i%16? 'rgba(124,58,237,.35)':'rgba(14,165,233,.35)'; ctx.fillRect(x+i,y,2,cardH); } ctx.restore(); }
+      ctx.restore(); }
+
+    function draw(){ if(!ctx) return; ctx.clearRect(0,0,W,H); // stock
+      const sx=margin, sy=pileY(); drawRounded(sx,sy,cardW,cardH,12); ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); ctx.save(); ctx.globalAlpha=.6; ctx.fillStyle='rgba(255,255,255,.2)'; for(let i=0;i<Math.min(state.dealsRemaining*10,50); i+=10){ ctx.fillRect(sx+6+i/50*8, sy+6, cardW-12, cardH-12);} ctx.restore(); ctx.fillStyle='var(--muted)'; ctx.font='12px system-ui'; ctx.fillText('Stock', sx, sy-6);
+      // foundations: 8 slots
+      const fx=W - margin - cardW*3, fy=sy; const slotW=cardW, slotH=cardH; for(let i=0;i<8;i++){ const x=fx + (i%4)*(slotW+12), y=fy + Math.floor(i/4)*(slotH+16); drawRounded(x,y,slotW,slotH,12); ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke(); if(i<state.foundations){ ctx.save(); ctx.globalAlpha=.55; ctx.fillStyle='rgba(34,211,238,.35)'; ctx.fillRect(x+6,y+6,slotW-12,slotH-12); ctx.restore(); }
+        // peacock eye motif
+        ctx.save(); ctx.globalAlpha=.18; ctx.strokeStyle=i<state.foundations? 'rgba(34,211,238,.9)':'rgba(14,165,233,.5)'; ctx.beginPath(); const cx=x+slotW/2, cy=y+slotH/2; ctx.ellipse(cx, cy, slotW*0.35, slotH*0.22, 0, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
+      ctx.fillStyle='var(--muted)'; ctx.font='12px system-ui'; ctx.fillText('Foundations', fx, fy-6);
+      // columns
+      const y0=topArea; for(let c=0;c<10;c++){ const x=colX(c); drawRounded(x,y0,cardW,cardH,12); ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke(); let yy=y0; const col=state.tableau[c]; for(let i=0;i<col.length;i++){ drawCard(x,yy,col[i]); yy += col[i].faceUp? overlapDown : overlapUp; }
+        if(col.length===0){ // visually indicate why Deal may be blocked
+          ctx.save(); ctx.setLineDash([6,4]); ctx.strokeStyle='rgba(245,158,11,.9)'; ctx.lineWidth=3; drawRounded(x-4,y0-4,cardW+8,cardH+8,14); ctx.stroke(); ctx.restore();
+        }
+        if(state.hint && state.hint.to===c){ ctx.save(); ctx.strokeStyle='rgba(20,184,166,.9)'; ctx.lineWidth=3; drawRounded(x-4,y0-4,cardW+8,cardH+8,14); ctx.stroke(); ctx.restore(); }
+      }
+      // drag ghost
+      if(drag.active){ let yy=drag.y - drag.grabOffsetY; for(const card of drag.stack){ drawCard(drag.x - drag.grabOffsetX, yy, card); yy += overlapDown; } }
+      // confetti particles
+      if(confetti.length){ for(const p of confetti){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=1; ctx.save(); ctx.globalAlpha=Math.max(0, p.life/80); ctx.fillStyle=p.color; ctx.translate(p.x,p.y); ctx.rotate(p.rot+=(p.spin)); ctx.fillRect(-4,-4,8,8); ctx.restore(); } confetti = confetti.filter(p=>p.life>0); requestAnimationFrame(draw); }
+    }
+
+    // ---------- Input / Drag ----------
+    const drag={active:false, fromCol:-1, startIndex:-1, stack:[], x:0,y:0, grabOffsetX:0, grabOffsetY:0};
+    function colAt(px){ for(let c=0;c<10;c++){ const x=colX(c); if(px>=x && px<=x+cardW) return c; } return -1; }
+    function rowAtInCol(py, col){ const y0=topArea; const colArr=state.tableau[col]; let yy=y0; for(let i=0;i<colArr.length;i++){ const yTop=yy, yBot=yy+(colArr[i].faceUp?overlapDown:overlapUp); if(py>=yTop && py<=yBot) return i; yy=yBot; } if(colArr.length) return colArr.length-1; return -1; }
+
+    function onPointerDown(e){ if(state.won) return; AudioKit.resume(); const rect=canvas.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top; const col=colAt(px); if(col<0) return; const row=rowAtInCol(py,col); if(row<0) return; const column=state.tableau[col]; const card=column[row]; if(!card.faceUp){ bounce(); return; }
+      // Validate same-suit descending tail from row
+      for(let i=column.length-1;i>row;i--){ const a=column[i], b=column[i-1]; if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ bounce(); flashMsg('Drag a same-suit descending tail'); return; } }
+      drag.active=true; drag.fromCol=col; drag.startIndex=row; drag.stack=structuredClone(column.slice(row)); drag.x=px; drag.y=py; drag.grabOffsetX=clamp(px - colX(col), 0, cardW); drag.grabOffsetY=clamp(py - (topArea + row*overlapDown), 0, cardH); window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp);
+    }
+    function onPointerMove(e){ const r=canvas.getBoundingClientRect(); drag.x=e.clientX-r.left; drag.y=e.clientY-r.top; draw(); }
+    function onPointerUp(e){ window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp); if(!drag.active) return; const r=canvas.getBoundingClientRect(); const px=e.clientX-r.left; const to=colAt(px); if(to>=0){ doMove(drag.fromCol, drag.startIndex, to); } drag.active=false; draw(); }
+    canvas.addEventListener('pointerdown', onPointerDown);
+
+    function bounce(){ canvas.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:120}); AudioKit.blip(200,0.05,'square',0.04); }
+
+    // ---------- Timer & UI ----------
+    let lastTick=now(); function tick(){ const t=now(); if(state.running){ state.elapsedMs+=(t-lastTick);} lastTick=t; updateUI(); requestAnimationFrame(tick); }
+    function fmtTime(ms){ const s=Math.floor(ms/1000); const m=(s/60)|0; const ss=(s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
+    function updateUI(){
+      $('time').textContent=fmtTime(state.elapsedMs);
+      $('moves').textContent=state.moves;
+      $('score').textContent=state.score;
+      $('deals').textContent=state.dealsRemaining;
+      $('seedLabel').textContent=state.seed;
+      const hasEmpty = state.tableau.some(c=>c.length===0);
+      const enoughStock = state.stock.length >= 10; // safety: one full row available
+      const dealDisabled = hasEmpty || state.dealsRemaining<=0 || !enoughStock;
+      $('dealBtn').disabled = dealDisabled;
+      $('dealBtn').title = state.dealsRemaining<=0 ? 'No deals left' : (!enoughStock ? 'Not enough cards in stock' : (hasEmpty ? 'Fill empty columns before dealing' : 'Deal next row'));
+      const reasonEl = $('dealReason');
+      if(dealDisabled){
+        reasonEl.style.display='inline-block';
+        reasonEl.textContent = state.dealsRemaining<=0 ? 'No deals left' : (!enoughStock ? 'Deal blocked: stock < 10' : 'Deal blocked: empty column(s)');
+      } else {
+        reasonEl.style.display='none';
+      }
+      $('undoBtn').disabled=state.history.length===0;
+      $('redoBtn').disabled=state.redo.length===0;
+      const diffSel = $('difficulty'); if(diffSel) diffSel.value = state.difficulty;
+      document.title = state.won? '✅ Spider – Win!' : 'Spider Solitaire – Peacock';
+    }
+    function flashMsg(m){ state.message=m; const el=$('msg'); el.textContent=m; el.style.opacity=1; el.animate([{opacity:1},{opacity:0}],{duration:1600, fill:'forwards'}); }
+
+    // ---------- Hints ----------
+    function computeHint(){ let best=null, score=-1; for(let from=0;from<10;from++){ const col=state.tableau[from]; if(!col.length||!top(col).faceUp) continue; for(let start=0; start<col.length; start++){ if(!col[start].faceUp) continue; let ok=true; for(let i=col.length-1;i>start;i--){ const a=col[i], b=col[i-1]; if(!(a.faceUp&&b.faceUp&&a.rank+1===b.rank&&a.suit===b.suit)){ ok=false; break; } } if(!ok) continue; const head=col[start]; for(let to=0;to<10;to++){ if(to===from) continue; const destTop=top(state.tableau[to]); if(canDrop(head, destTop)){ let s=0; if(start>0 && !col[start-1].faceUp) s+=3; if(destTop && destTop.suit===head.suit && destTop.rank===head.rank+1) s+=2; if(col.length===start+1 && col.length-1===0) s+=2; if(s>score){ score=s; best={from,start,to}; } } } } } return best; }
+    function showHint(){ const h=computeHint(); state.hint=h; draw(); if(h){ flashMsg(`Hint: Move from ${h.from+1} to ${h.to+1}`); setTimeout(()=>{ state.hint=null; draw(); }, 1400); } else { flashMsg('No moves found'); } }
+
+    // ---------- Verification ----------
+    function verifyInventory(){
+      // Build index of all cards by id across tableau, stock, foundations
+      const loc = new Array(104).fill(null);
+      const place = (card, where)=>{ if(loc[card.id]!==null) duplicates.push(card.id); loc[card.id]=where; counts.total++; rankCounts[card.rank] = (rankCounts[card.rank]||0)+1; suitCounts[card.suit] = (suitCounts[card.suit]||0)+1; };
+      const duplicates=[]; const rankCounts={}; const suitCounts={}; const counts={total:0, tableau:0, stock:0, foundations:0};
+      // tableau
+      for(const col of state.tableau){ for(const c of col){ place(c,'T'); counts.tableau++; } }
+      // stock
+      for(const c of state.stock){ place(c,'S'); counts.stock++; }
+      // foundations
+      for(const c of state.foundationsCards){ place(c,'F'); counts.foundations++; }
+      const missing=[]; for(let i=0;i<loc.length;i++){ if(loc[i]===null) missing.push(i); }
+      const ok = duplicates.length===0 && missing.length===0 && counts.total===104 && counts.tableau+counts.stock+counts.foundations===104;
+      console.group('%cSpider Verify','color:#22d3ee');
+      console.log('Totals', counts);
+      console.log('Duplicates (ids):', duplicates);
+      console.log('Missing (ids):', missing);
+      console.table(Object.entries(rankCounts).sort((a,b)=>a[0]-b[0]).map(([r,n])=>({rank:+r,count:n})));
+      console.table(suitCounts);
+      console.groupEnd();
+      flashMsg(ok? 'Deck OK ✓ (see console for counts)' : `Issues: dup=${duplicates.length} missing=${missing.length}`);
+      return {ok, duplicates, missing, counts};
+    }
+
+    // ---------- Win modal ----------
+    let confetti=[]; function burst(){ for(let i=0;i<180;i++){ confetti.push({ x: W/2, y: topArea+cardH/2, vx:(Math.random()*4-2), vy:(Math.random()*-5-2), rot:0, spin:(Math.random()*.2-.1), life: 80+(Math.random()*40|0), color:`hsl(${(Math.random()*360|0)},80%,60%)`}); } draw(); }
+    function showWin(){ $('winTime').textContent=fmtTime(state.elapsedMs); $('winMoves').textContent=state.moves; $('winScore').textContent=state.score; $('winModal').style.display='grid'; burst(); }
+    $('playAgain').onclick=()=>{ $('winModal').style.display='none'; newGame({difficulty:state.difficulty}); };
+    $('shareSeed').onclick=async()=>{ const url=new URL(location.href); url.searchParams.set('seed', state.seed); url.searchParams.set('difficulty', state.difficulty); try{ await navigator.clipboard.writeText(url.toString()); flashMsg('Link copied'); }catch{ flashMsg(url.toString()); } };
+
+    // ---------- Controls ----------
+    $('newBtn').onclick=()=> newGame({difficulty:state.difficulty});
+    $('replayBtn').onclick=()=> newGame({difficulty:state.difficulty, seed:state.seed});
+    $('dealBtn').onclick=()=> dealRow();
+    $('undoBtn').onclick=()=> undo();
+    $('redoBtn').onclick=()=> redo();
+    $('hintBtn').onclick=()=> showHint();
+    $('difficulty').onchange=(e)=> newGame({difficulty:e.target.value});
+    $('setSeedBtn').onclick=()=>{ const v=$('seedInput').value.trim(); if(v){ const u=new URL(location.href); u.searchParams.set('seed', v); u.searchParams.set('difficulty', state.difficulty); history.replaceState({},'',u); newGame({difficulty:state.difficulty, seed:v}); } };
+    $('muteBtn').onclick=()=>{ const v=!AudioKit.isMuted(); AudioKit.setMuted(v); $('muteBtn').textContent=v?'🔇':'🔊'; };
+    $('verifyBtn').onclick=()=> verifyInventory();
+    window.addEventListener('keydown', (e)=>{ if(e.repeat) return; const k=e.key.toLowerCase(); if(k==='n') $('newBtn').click(); else if(k==='d') $('dealBtn').click(); else if(k==='u') $('undoBtn').click(); else if(k==='r') $('redoBtn').click(); else if(k==='h') $('hintBtn').click(); else if(k==='v') $('verifyBtn').click(); });
+
+    // ---------- Boot ----------
+    function initFromURL(){ const url=new URL(location.href); const seed=url.searchParams.get('seed')||randSeed(); const diff=url.searchParams.get('difficulty')||'1-suit'; return {seed,difficulty:diff}; }
+    resize(); const init=initFromURL(); if(!loadGame()){ newGame(init); } requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
+
