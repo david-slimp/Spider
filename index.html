@@ -27,7 +27,70 @@
     #game{position:fixed;inset:0}
     .kbd{padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.06);font-size:12px}
     .win{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:20}
-    .win .modal{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:24px;min-width:340px;text-align:center;backdrop-filter:blur(10px)}
+    .win .modal-content { background:#2a2a2a; padding:24px; border-radius:12px; max-width:90%; max-height:90%; overflow-y:auto; position:relative; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
+    .modal h2 { margin-top:0; color:#fff; text-align:center; }
+    .modal h3 { color:#ddd; margin: 16px 0 12px; font-size: 1.2em; }
+    
+    /* Stats container */
+    .stats-container { display: flex; flex-direction: column; gap: 24px; }
+    .stats-section { background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; }
+    
+    /* Stats grid */
+    .stats-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px; 
+      margin-top: 12px;
+    }
+    .stat-item {
+      background: rgba(255,255,255,0.1);
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 0.95em;
+    }
+    .stat-label {
+      font-weight: bold;
+      color: #fff;
+      margin-right: 8px;
+    }
+    
+    /* Recent games */
+    .recent-games {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+    .game-record {
+      background: rgba(255,255,255,0.1);
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 0.9em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .game-record.win { border-left: 4px solid #4CAF50; }
+    .game-record.loss { border-left: 4px solid #f44336; }
+    .game-record.abandoned { border-left: 4px solid #ff9800; }
+    .game-record .game-outcome {
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.8em;
+    }
+    .game-record.win .game-outcome { background: rgba(76, 175, 80, 0.2); color: #4CAF50; }
+    .game-record.loss .game-outcome { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+    .game-record.abandoned .game-outcome { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+    .game-record .game-details {
+      display: flex;
+      gap: 16px;
+      font-size: 0.9em;
+      color: #bbb;
+    }
+    .game-record .game-time {
+      font-family: monospace;
+    }
     .row{display:flex;gap:10px;justify-content:center;margin-top:14px}
     .seedbox{width:160px}
     .hint-list {
@@ -69,23 +132,96 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 1000;
+      background: rgba(0,0,0,0.7);
       justify-content: center;
       align-items: center;
-      backdrop-filter: blur(1px);
+      z-index: 1000;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    
+    .modal-content {
+      background: var(--bg1);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    
+    .stats-container {
+      display: flex;
+      gap: 20px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    
+    .stats-section {
+      flex: 1;
+      min-width: 300px;
+      background: var(--panel);
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    
+    .recent-games {
+      margin-top: 12px;
+    }
+    
+    .recent-game {
+      background: rgba(255,255,255,0.05);
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+    
+    .recent-game div {
+      margin: 4px 0;
+    }
+    
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    
+    .modal-buttons button {
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+    
+    .modal-buttons button:hover {
+      opacity: 0.9;
     }
   </style>
 </head>
 <body>
   <div id="hud">
-    <div class="card" style="margin-bottom: 10px">
-      <div>David's Spider - v0.0.2 // </div>
-      <div>Time: <span id="time">0:00</span></div>
-      <div>Moves: <span id="moves">0</span></div>
-      <div>Score: <span id="score">500</span></div>
-      <div>Deals: <span id="deals">5</span></div>
-      <div class="pill">Seed: <span id="seedLabel"></span></div>
+    <div class="card" style="margin-bottom: 10px; width: 100%; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; gap: 15px; align-items: center;">
+        <div>David's Spider - v0.0.3</div>
+        <div>Time: <span id="time">0:00</span></div>
+        <div>Moves: <span id="moves">0</span></div>
+        <div>Score: <span id="score">500</span></div>
+        <div>Deals: <span id="deals">5</span></div>
+        <div class="pill">Seed: <span id="seedLabel"></span></div>
+      </div>
+      <button id="showStats" style="margin-left: auto;">📊 Stats</button>
     </div>
     <div class="card" style="gap:8px">
       <button id="newBtn" title="N">New</button>
@@ -131,10 +267,37 @@
     </div>
   </div>
 
+  <!-- Statistics Modal -->
+  <div id="statsModal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+      <h2>📊 Game Statistics</h2>
+      <div class="stats-container">
+        <div class="stats-section">
+          <h3>Overall Statistics</h3>
+          <div id="overallStats" class="stats-grid"></div>
+        </div>
+        <div class="stats-section">
+          <h3>Recent Games</h3>
+          <div id="recentGames" class="recent-games"></div>
+        </div>
+      </div>
+      <div class="modal-buttons">
+        <button id="closeStats">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Statistics Module -->
+  <script type="module" src="./stats.js"></script>
+  
   <script type="module">
+    // Import stats module
+    import { trackGameStart, updateActiveGame, recordGameResult, recoverIncompleteGames, getGameStats } from './stats.js';
+    
     // =============================
-    // Spider Solitaire v 0.0.1  / single file
-    // Built to the PRD (seeded RNG, strict rules, K→A same-suit completion, hints, undo/redo)
+    // Spider Solitaire v 0.0.2
+    // - Added game statistics tracking
+    // - Added auto-save and recovery
     // =============================
     const $ = (id)=>document.getElementById(id);
     const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -148,16 +311,85 @@
     const randSeed = ()=>{ const a=new Uint32Array(2); crypto.getRandomValues(a); return (a[0].toString(36)+a[1].toString(36)).slice(0,10); };
 
     // ---------- Sounds (WebAudio) ----------
-    const AudioKit = (()=>{ const ctx = new (window.AudioContext||window.webkitAudioContext)(); let muted=false; function blip(freq=880,len=0.06,type='triangle',gain=0.05){ if(muted) return; const o=ctx.createOscillator(); const g=ctx.createGain(); o.type=type; o.frequency.value=freq; o.connect(g); g.connect(ctx.destination); g.gain.value=gain; o.start(); g.gain.setValueAtTime(gain, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+len); o.stop(ctx.currentTime+len); }
-      function chord(){ if(muted) return; [523,659,784,988].forEach((f,i)=>setTimeout(()=>blip(f,0.16,'sine',0.06), i*70)); }
-      return { blip, chord, setMuted(v){muted=v}, isMuted(){return muted}, resume(){ctx.resume?.()} };
+    const AudioKit = (()=>{ 
+      const ctx = new (window.AudioContext||window.webkitAudioContext)(); 
+      let muted = localStorage.getItem('audioMuted') === 'true' || false;
+      
+      // Base sound generator
+      function generateSound(freq=880, len=0.06, type='triangle', gain=0.05, click=false) { 
+        if (muted) return null;
+        
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.value = freq;
+        o.connect(g);
+        
+        // For click sound, create a sharp attack
+        if (click) {
+          g.gain.setValueAtTime(0, ctx.currentTime);
+          g.gain.linearRampToValueAtTime(gain, ctx.currentTime + 0.001);
+          g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + len);
+        } else {
+          g.gain.value = gain;
+          g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + len);
+        }
+        
+        g.connect(ctx.destination);
+        o.start();
+        o.stop(ctx.currentTime + len);
+        return o;
+      }
+      
+      // Sound effects
+      function blip(freq=880, len=0.06, type='triangle', gain=0.05) { 
+        generateSound(freq, len, type, gain);
+      }
+      
+      function click() {
+        generateSound(1000, 0.04, 'sine', 0.2, true);
+      }
+      
+      function thud() {
+        generateSound(80, 0.2, 'sine', 0.3);
+      }
+      
+      function chord() { 
+        if (muted) return; 
+        [523, 659, 784, 988].forEach((f, i) => 
+          setTimeout(() => generateSound(f, 0.16, 'sine', 0.06), i * 70)
+        );
+      }
+      
+      function setMuted(v) {
+        muted = v;
+        localStorage.setItem('audioMuted', v);
+        // Update button text if it exists
+        const muteBtn = document.getElementById('muteBtn');
+        if (muteBtn) {
+          muteBtn.textContent = v ? '🔇' : '🔊';
+        }
+      }
+      
+      return { 
+        blip, 
+        click,
+        thud,
+        chord, 
+        setMuted, 
+        isMuted: () => muted, 
+        resume() { 
+          if (ctx.state === 'suspended') {
+            ctx.resume();
+          }
+        } 
+      };
     })();
 
     // ---------- Engine State ----------
-    const SUITS=['♠','♥','♦','♣'];
     const state = {
       difficulty:'1-suit', seed:'', rng:null,
-      tableau:[], stock:[], dealsRemaining:5, foundations:0,
+      tableau:[[],[],[],[],[],[],[],[],[],[]], stock:[], dealsRemaining:5, foundations:0,
       moves:0, score:500, startTime:0, elapsedMs:0, running:true,
       history:[], redo:[], message:'', hint:null, won:false, foundationsCards:[]
     };
@@ -203,50 +435,239 @@
     }
 
     // ---------- Game actions ----------
-    function newGame({difficulty=state.difficulty, seed=randSeed(), custom=false}={}){
+    function newGame({difficulty=state.difficulty, seed=randSeed()}={}){
+      // Track the new game in statistics
+      const suitCount = difficulty === '1-suit' ? 1 : difficulty === '2-suit' ? 2 : 4;
+      trackGameStart({ suitCount, seed, difficulty });
+      
       state.difficulty=difficulty; state.seed=seed; state.rng=mulberry32(hashSeed(difficulty+':'+seed));
       const deck=createDeck(difficulty); shuffle(deck, state.rng);
       const deal=initialDeal(deck);
       state.tableau=deal.tableau; state.stock=deal.stock; state.dealsRemaining=5; state.foundations=0;
       state.moves=0; state.score=500; state.history=[]; state.redo=[]; state.message=''; state.hint=null; state.won=false;
       state.startTime=now(); state.elapsedMs=0; state.running=true; updateUI(); draw();
+      
       // Reset and start the timer
       lastTick = now();
       tick();
       saveGame();
     }
 
-    function dealRow(){ if(state.dealsRemaining<=0){ flashMsg('No deals left'); return false; } for(let c=0;c<10;c++){ if(state.tableau[c].length===0){ flashMsg('Fill empty columns before dealing'); return false; } }
-      const dealt=[]; for(let c=0;c<10;c++){ const card=state.stock.shift(); card.faceUp=true; state.tableau[c].push(card); dealt.push(card); }
-      state.dealsRemaining--; state.history.push({t:'deal', dealt}); state.redo=[]; state.moves++; state.score=Math.max(0,state.score-1); AudioKit.blip(420,0.05);
-      // post-deal completion on each column
-      for(let c=0;c<10;c++){ completeTopRun(c); }
-      checkWin(); updateUI(); draw(); saveGame(); return true; }
+    function dealRow(){ 
+      if(state.dealsRemaining<=0){ flashMsg('No deals left'); return false; }
+      for(let c=0;c<10;c++){ if(state.tableau[c].length===0){ flashMsg('Fill empty columns before dealing'); return false; } }
+      
+      const dealt=[];
+      for(let c=0;c<10;c++){
+        const card=state.stock.shift();
+        card.faceUp=true;
+        state.tableau[c].push(card);
+        dealt.push(card);
+      }
+      
+      state.dealsRemaining--;
+      state.history.push({t:'deal', dealt});
+      state.redo=[];
+      state.moves++;
+      state.score=Math.max(0,state.score-1);
+      
+      // Update active game stats
+      updateActiveGame({
+        moves: state.moves,
+        score: state.score,
+        lastMove: new Date().toISOString()
+      });
+      
+      // Check for completion after dealing
+      for(let c=0;c<10;c++){
+        completeTopRun(c);
+      }
+      
+      updateUI();
+      draw();
+      saveGame();
+      AudioKit.blip(420,0.05);
+      
+      return true;
+    }
 
-    function doMove(from, startIndex, to){ if(from===to) return false; const src=state.tableau[from], dst=state.tableau[to]; const n=src.length; if(startIndex<0||startIndex>=n) return false; // validate same-suit descending from startIndex..end
-      for(let i=n-1;i>startIndex;i--){ const a=src[i], b=src[i-1]; if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ bounce(); flashMsg('Select a same-suit descending tail'); return false; } }
-      const moved=src.slice(startIndex); if(!canDrop(moved[0], top(dst))){ bounce(); flashMsg('Illegal move'); return false; }
-      dst.push(...moved); src.length=startIndex; let turned=null; if(src.length && !top(src).faceUp){ top(src).faceUp=true; turned=top(src); }
-      state.history.push({t:'move', from, to, moved:structuredClone(moved), turned}); state.redo=[]; state.moves++; state.score=Math.max(0,state.score-1); AudioKit.blip(700,0.05,'triangle',0.045);
+    function doMove(from, startIndex, to){ 
+      if(from===to) return false; 
+      const src=state.tableau[from], dst=state.tableau[to]; 
+      const n=src.length; 
+      if(startIndex<0||startIndex>=n) return false; 
+      // validate same-suit descending from startIndex..end
+      for(let i=n-1;i>startIndex;i--){ 
+        const a=src[i], b=src[i-1]; 
+        if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ 
+          bounce(); 
+          flashMsg('Select a same-suit descending tail'); 
+          return false; 
+        } 
+      }
+      const moved=src.slice(startIndex); 
+      if(!canDrop(moved[0], top(dst))){ 
+        bounce(); 
+        flashMsg('Illegal move'); 
+        return false; 
+      }
+      dst.push(...moved); 
+      src.length=startIndex; 
+      let turned=null; 
+      if(src.length && !top(src).faceUp){ 
+        top(src).faceUp=true; 
+        turned=top(src); 
+      }
+      state.history.push({t:'move', from, to, moved:structuredClone(moved), turned}); 
+      state.redo=[]; 
+      state.moves++; 
+      state.score=Math.max(0,state.score-1); 
+      
+      // Update active game stats
+      updateActiveGame({
+        moves: state.moves,
+        score: state.score,
+        lastMove: new Date().toISOString()
+      });
+      
       // try completes on both piles
       completeTopRun(to);
       completeTopRun(from);
-      checkWin(); updateUI(); draw(); saveGame(); return true; }
+      checkWin(); 
+      updateUI(); 
+      draw(); 
+      saveGame(); 
+      return true; 
+    }
 
-    function undo(){ const h=state.history.pop(); if(!h) return; if(h.t==='complete'){ const col=state.tableau[h.col]; col.push(...h.cards); if(h.turned){ const idx=col.findIndex(c=>c.id===h.turned.id); if(idx>=0) col[idx].faceUp=false; } removeFromFoundations(h.cards); state.foundations--; state.redo.push(h); }
-      else if(h.t==='move'){ const colFrom=state.tableau[h.from], colTo=state.tableau[h.to]; const k=h.moved.length; colTo.splice(colTo.length-k,k); colFrom.push(...h.moved); if(h.turned){ const idx=colFrom.findIndex(c=>c.id===h.turned.id); if(idx>=0) colFrom[idx].faceUp=false; } state.redo.push(h); }
-      else if(h.t==='deal'){ for(let i=9;i>=0;i--){ const card=state.tableau[i].pop(); card.faceUp=false; state.stock.unshift(card); } state.dealsRemaining++; state.redo.push(h); }
-      state.moves++; draw(); updateUI(); saveGame(); }
+    function undo(){ 
+      const h=state.history.pop(); 
+      if(!h) return;
+      
+      if(h.t==='complete'){
+        const col=state.tableau[h.col];
+        col.push(...h.cards);
+        if(h.turned){
+          const idx=col.findIndex(c=>c.id===h.turned.id);
+          if(idx>=0) col[idx].faceUp=false;
+        }
+        removeFromFoundations(h.cards);
+        state.foundations--;
+        state.score -= 100;
+        state.redo.push(h);
+      }
+      else if(h.t==='move'){
+        const colFrom=state.tableau[h.from], colTo=state.tableau[h.to];
+        const k=h.moved.length;
+        colTo.splice(colTo.length-k,k);
+        colFrom.push(...h.moved);
+        if(h.turned){
+          const idx=colFrom.findIndex(c=>c.id===h.turned.id);
+          if(idx>=0) colFrom[idx].faceUp=false;
+        }
+        state.redo.push(h);
+      }
+      else if(h.t==='deal'){
+        for(let i=9;i>=0;i--){
+          const card=state.tableau[i].pop();
+          card.faceUp=false;
+          state.stock.unshift(card);
+        }
+        state.dealsRemaining++;
+        state.redo.push(h);
+      }
+      
+      state.moves++;
+      
+      // Update active game stats after undo
+      updateActiveGame({
+        moves: state.moves,
+        score: state.score,
+        foundations: state.foundations,
+        lastMove: new Date().toISOString()
+      });
+      
+      draw();
+      updateUI();
+      saveGame();
+    }
 
-    function redo(){ const h=state.redo.pop(); if(!h) return; if(h.t==='complete'){ const col=state.tableau[h.col]; col.splice(col.length-13,13); if(h.turned){ const idx=col.findIndex(c=>c.id===h.turned.id); if(idx>=0) col[idx].faceUp=true; } state.foundationsCards.push(...h.cards); state.foundations++; state.history.push(h); }
-      else if(h.t==='move'){ const colFrom=state.tableau[h.from], colTo=state.tableau[h.to]; colFrom.splice(colFrom.length-h.moved.length, h.moved.length); colTo.push(...h.moved); if(h.turned){ const idx=colFrom.findIndex(c=>c.id===h.turned.id); if(idx>=0) colFrom[idx].faceUp=true; } state.history.push(h); }
-      else if(h.t==='deal'){ for(let c=0;c<10;c++){ const card=state.stock.shift(); card.faceUp=true; state.tableau[c].push(card); } state.dealsRemaining--; state.history.push(h); }
-      state.moves++; draw(); updateUI(); saveGame(); }
+    function redo(){ 
+      const h=state.redo.pop(); 
+      if(!h) return;
+      
+      if(h.t==='complete'){
+        const col=state.tableau[h.col];
+        col.splice(col.length-13,13);
+        if(h.turned){
+          const idx=col.findIndex(c=>c.id===h.turned.id);
+          if(idx>=0) col[idx].faceUp=true;
+        }
+        state.foundationsCards.push(...h.cards);
+        state.foundations++;
+        state.score += 100;
+        state.history.push(h);
+      }
+      else if(h.t==='move'){
+        const colFrom=state.tableau[h.from], colTo=state.tableau[h.to];
+        colFrom.splice(colFrom.length-h.moved.length, h.moved.length);
+        colTo.push(...h.moved);
+        if(h.turned){
+          const idx=colFrom.findIndex(c=>c.id===h.turned.id);
+          if(idx>=0) colFrom[idx].faceUp=true;
+        }
+        state.history.push(h);
+      }
+      else if(h.t==='deal'){
+        for(let c=0;c<10;c++){
+          const card=state.stock.shift();
+          card.faceUp=true;
+          state.tableau[c].push(card);
+        }
+        state.dealsRemaining--;
+        state.history.push(h);
+      }
+      
+      state.moves++;
+      
+      // Update active game stats after redo
+      updateActiveGame({
+        moves: state.moves,
+        score: state.score,
+        foundations: state.foundations,
+        lastMove: new Date().toISOString()
+      });
+      
+      draw();
+      updateUI();
+      saveGame();
+    }
 
-    function checkWin(){ if(state.foundations===8){ state.won=true; state.running=false; AudioKit.chord(); showWin(); } }
+    function checkWin(){ 
+      if(state.foundations===8){ 
+        state.won=true; 
+        state.running=false; 
+        AudioKit.chord(); 
+        recordGameResult('win');
+        showWin(); 
+      } 
+    }
 
     // ---------- Persistence ----------
     const STORAGE_KEY='spider.v2.lastGame';
+    
+    // Check for incomplete game on load
+    window.addEventListener('load', async () => {
+      try {
+        const incompleteGame = await recoverIncompleteGames();
+        if (incompleteGame) {
+          // Mark any incomplete game as abandoned without showing a popup
+          recordGameResult('abandoned');
+        }
+      } catch {
+        // Silently handle any errors during game recovery
+      }
+    });
     function saveGame(){
       try{
         const payload={
@@ -280,12 +701,40 @@
 
     function drawRounded(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 
-    function drawPeacockGlass(x,y,w,h){ // background motif
-      const g=ctx.createLinearGradient(x,y,x+w,y+h); g.addColorStop(0,'rgba(34,211,238,.12)'); g.addColorStop(1,'rgba(124,58,237,.12)'); ctx.fillStyle=g; ctx.fillRect(x,y,w,h);
-      ctx.globalAlpha=.18; ctx.strokeStyle='rgba(14,165,233,.6)'; for(let i=0;i<8;i++){ ctx.beginPath(); const cx=x+w/2, cy=y+h/2; const r=w*0.5*(1-i/8); ctx.ellipse(cx, cy, r, r*0.55, 0, 0, Math.PI*2); ctx.stroke(); } ctx.globalAlpha=1;
-    }
+    // Background motif drawing function (kept but not used to avoid breaking existing code)
+    // Background motif drawing function (commented out as it's not currently used)
+    // function drawPeacockGlass(x, y, w, h) {
+    //   const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    //   g.addColorStop(0, 'rgba(34,211,238,.12)');
+    //   g.addColorStop(1, 'rgba(124,58,237,.12)');
+    //   ctx.fillStyle = g;
+    //   ctx.fillRect(x, y, w, h);
+    //   
+    //   ctx.globalAlpha = 0.18;
+    //   ctx.strokeStyle = 'rgba(14,165,233,.6)';
+    //   for (let i = 0; i < 8; i++) {
+    //     ctx.beginPath();
+    //     const cx = x + w / 2, cy = y + h / 2;
+    //     const r = w * 0.5 * (1 - i / 8);
+    //     ctx.ellipse(cx, cy, r, r * 0.55, 0, 0, Math.PI * 2);
+    //     ctx.stroke();
+    //   }
+    //   ctx.globalAlpha = 1;
+    // }
 
-    function drawCard(x,y,card){ const r=12; ctx.save(); ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=12; ctx.shadowOffsetY=8; if(card.faceUp){ drawRounded(x,y,cardW,cardH,r); ctx.fillStyle='#ffffff'; // White background for face-up cards
+    function drawCard(x,y,card){ 
+      const r=12; 
+      ctx.save(); 
+      ctx.shadowColor='rgba(0,0,0,.4)'; 
+      ctx.shadowBlur=12; 
+      ctx.shadowOffsetY=8; 
+      
+      // Draw the card background
+      drawRounded(x,y,cardW,cardH,r);
+      
+      if(card.faceUp) {
+        // Draw face-up card
+        ctx.fillStyle='#ffffff'; // White background for face-up cards
         ctx.fill();
         // Add subtle border
         ctx.strokeStyle='rgba(0,0,0,0.1)'; 
@@ -298,25 +747,48 @@
         ctx.fillStyle=grad;
         drawRounded(x,y,cardW,cardH,r);
         ctx.fill();
-        // Rank + suit with proper colors
+        
+        // Draw rank and suit
         const rankStr = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'][card.rank-1];
         const isRed = RED.has(card.suit);
         const textColor = isRed ? '#cc0000' : '#000000';
         
-        // Draw rank (top left)
         ctx.font = `bold ${Math.floor(cardW*0.24)}px system-ui`;
         ctx.textBaseline = 'top';
         ctx.fillStyle = textColor;
         ctx.fillText(rankStr, x+10, y+8);
         
-        // Draw suit (bottom right)
         ctx.font = `bold ${Math.floor(cardW*0.28)}px system-ui`;
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = textColor;
         ctx.fillText(card.suit, x+cardW-Math.floor(cardW*0.28)-8, y+cardH-12);
-      } else { drawRounded(x,y,cardW,cardH,r); const g=ctx.createLinearGradient(x,y,x+cardW,y+cardH); g.addColorStop(0,'#1f2937'); g.addColorStop(1,'#0b1220'); ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke(); ctx.save(); ctx.clip(); ctx.globalAlpha=.22; // feather stripes
-        for(let i=0;i<cardW;i+=8){ ctx.fillStyle=i%16? 'rgba(124,58,237,.35)':'rgba(14,165,233,.35)'; ctx.fillRect(x+i,y,2,cardH); } ctx.restore(); }
-      ctx.restore(); }
+      } else {
+        // Draw face-down card
+        ctx.fillStyle='#1a3a5f'; // Dark blue background for face-down cards
+        ctx.fill();
+        // Add subtle border
+        ctx.strokeStyle='rgba(255,255,255,0.1)'; 
+        ctx.lineWidth=1; 
+        ctx.stroke();
+        
+        // Add subtle pattern to face-down cards
+        ctx.save();
+        ctx.globalAlpha = 0.1;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        const patternSize = 12;
+        for (let py = y + patternSize; py < y + cardH; py += patternSize * 2) {
+          ctx.beginPath();
+          for (let px = x + (py % (patternSize * 2) === 0 ? 0 : patternSize); px < x + cardW; px += patternSize * 2) {
+            ctx.moveTo(px, py);
+            ctx.lineTo(px + patternSize, py + patternSize);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.restore(); 
+    }
 
     function draw(){ if(!ctx) return; ctx.clearRect(0,0,W,H); // stock
       const sx=margin, sy=pileY(); drawRounded(sx,sy,cardW,cardH,12); ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); ctx.save(); ctx.globalAlpha=.6; ctx.fillStyle='rgba(255,255,255,.2)'; for(let i=0;i<Math.min(state.dealsRemaining*10,50); i+=10){ ctx.fillRect(sx+6+i/50*8, sy+6, cardW-12, cardH-12);} ctx.restore(); ctx.fillStyle='var(--muted)'; ctx.font='12px system-ui'; ctx.fillText('Stock', sx, sy-6);
@@ -326,9 +798,33 @@
         ctx.save(); ctx.globalAlpha=.18; ctx.strokeStyle=i<state.foundations? 'rgba(34,211,238,.9)':'rgba(14,165,233,.5)'; ctx.beginPath(); const cx=x+slotW/2, cy=y+slotH/2; ctx.ellipse(cx, cy, slotW*0.35, slotH*0.22, 0, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
       ctx.fillStyle='var(--muted)'; ctx.font='12px system-ui'; ctx.fillText('Foundations', fx, fy-6);
       // columns
-      const y0=topArea; for(let c=0;c<10;c++){ const x=colX(c); drawRounded(x,y0,cardW,cardH,12); ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke(); let yy=y0; const col=state.tableau[c]; for(let i=0;i<col.length;i++){ drawCard(x,yy,col[i]); yy += col[i].faceUp? overlapDown : overlapUp; }
-        if(col.length===0){ // visually indicate why Deal may be blocked
-          ctx.save(); ctx.setLineDash([6,4]); ctx.strokeStyle='rgba(245,158,11,.9)'; ctx.lineWidth=3; drawRounded(x-4,y0-4,cardW+8,cardH+8,14); ctx.stroke(); ctx.restore();
+      const y0=topArea; 
+      for(let c=0;c<10;c++){ 
+        const x=colX(c);
+        const col = state.tableau[c];
+        
+        // Draw the cards in the column first
+        let yy = y0;
+        for(let i=0; i<col.length; i++){ 
+          drawCard(x,yy,col[i]); 
+          yy += col[i].faceUp ? overlapDown : overlapUp; 
+        }
+        
+        // Only draw the empty column indicator if the column is truly empty
+        if(col.length === 0) {
+          // Draw the empty column background
+          drawRounded(x,y0,cardW,cardH,12); 
+          ctx.strokeStyle='rgba(255,255,255,.12)'; 
+          ctx.stroke();
+          
+          // Draw the dashed yellow border for empty columns
+          ctx.save(); 
+          ctx.setLineDash([6,4]); 
+          ctx.strokeStyle='rgba(245,158,11,.9)'; 
+          ctx.lineWidth=3; 
+          drawRounded(x-4,y0-4,cardW+8,cardH+8,14); 
+          ctx.stroke(); 
+          ctx.restore();
         }
         if(state.hint && state.hint.to===c){ ctx.save(); ctx.strokeStyle='rgba(20,184,166,.9)'; ctx.lineWidth=3; drawRounded(x-4,y0-4,cardW+8,cardH+8,14); ctx.stroke(); ctx.restore(); }
       }
@@ -343,13 +839,41 @@
     function colAt(px){ for(let c=0;c<10;c++){ const x=colX(c); if(px>=x && px<=x+cardW) return c; } return -1; }
     function rowAtInCol(py, col){ const y0=topArea; const colArr=state.tableau[col]; let yy=y0; for(let i=0;i<colArr.length;i++){ const yTop=yy, yBot=yy+(colArr[i].faceUp?overlapDown:overlapUp); if(py>=yTop && py<=yBot) return i; yy=yBot; } if(colArr.length) return colArr.length-1; return -1; }
 
-    function onPointerDown(e){ if(state.won) return; AudioKit.resume(); const rect=canvas.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top; const col=colAt(px); if(col<0) return; const row=rowAtInCol(py,col); if(row<0) return; const column=state.tableau[col]; const card=column[row]; if(!card.faceUp){ bounce(); return; }
+    function onPointerDown(e){ 
+      if(state.won) return; 
+      AudioKit.resume(); 
+      const rect=canvas.getBoundingClientRect(); 
+      const px=e.clientX-rect.left, py=e.clientY-rect.top; 
+      const col=colAt(px); 
+      if(col<0) return; 
+      const row=rowAtInCol(py,col); 
+      if(row<0) return; 
+      const column=state.tableau[col]; 
+      const card=column[row]; 
+      if(!card.faceUp){ 
+        bounce(); 
+        return; 
+      }
+      AudioKit.click(); // Play click sound when selecting a card
       // Validate same-suit descending tail from row
       for(let i=column.length-1;i>row;i--){ const a=column[i], b=column[i-1]; if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ bounce(); flashMsg('Drag a same-suit descending tail'); return; } }
       drag.active=true; drag.fromCol=col; drag.startIndex=row; drag.stack=structuredClone(column.slice(row)); drag.x=px; drag.y=py; drag.grabOffsetX=clamp(px - colX(col), 0, cardW); drag.grabOffsetY=clamp(py - (topArea + row*overlapDown), 0, cardH); window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp);
     }
     function onPointerMove(e){ const r=canvas.getBoundingClientRect(); drag.x=e.clientX-r.left; drag.y=e.clientY-r.top; draw(); }
-    function onPointerUp(e){ window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp); if(!drag.active) return; const r=canvas.getBoundingClientRect(); const px=e.clientX-r.left; const to=colAt(px); if(to>=0){ doMove(drag.fromCol, drag.startIndex, to); } drag.active=false; draw(); }
+    function onPointerUp(e){ 
+      window.removeEventListener('pointermove', onPointerMove); 
+      window.removeEventListener('pointerup', onPointerUp); 
+      if(!drag.active) return; 
+      const r=canvas.getBoundingClientRect(); 
+      const px=e.clientX-r.left; 
+      const to=colAt(px); 
+      if(to>=0){ 
+        doMove(drag.fromCol, drag.startIndex, to);
+        AudioKit.thud(); // Play thud sound when dropping cards
+      } 
+      drag.active=false; 
+      draw(); 
+    }
     canvas.addEventListener('pointerdown', onPointerDown);
 
     function bounce(){ canvas.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:120}); AudioKit.blip(200,0.05,'square',0.04); }
@@ -513,6 +1037,11 @@
       }
     };
 
+    // ========== Helper Functions ==========
+    // checkTableauCompletion function has been consolidated into the game logic
+    
+    // randSeed function is defined elsewhere in the code
+
     // ---------- Verification ----------
     function verifyInventory(){
       // Build index of all cards by id across tableau, stock, foundations
@@ -527,14 +1056,7 @@
       for(const c of state.foundationsCards){ place(c,'F'); counts.foundations++; }
       const missing=[]; for(let i=0;i<loc.length;i++){ if(loc[i]===null) missing.push(i); }
       const ok = duplicates.length===0 && missing.length===0 && counts.total===104 && counts.tableau+counts.stock+counts.foundations===104;
-      console.group('%cSpider Verify','color:#22d3ee');
-      console.log('Totals', counts);
-      console.log('Duplicates (ids):', duplicates);
-      console.log('Missing (ids):', missing);
-      console.table(Object.entries(rankCounts).sort((a,b)=>a[0]-b[0]).map(([r,n])=>({rank:+r,count:n})));
-      console.table(suitCounts);
-      console.groupEnd();
-      flashMsg(ok? 'Deck OK ✓ (see console for counts)' : `Issues: dup=${duplicates.length} missing=${missing.length}`);
+      flashMsg(ok? 'Deck OK ✓' : `Issues: dup=${duplicates.length} missing=${missing.length}`);
       return {ok, duplicates, missing, counts};
     }
 
@@ -552,14 +1074,123 @@
     $('redoBtn').onclick=()=> redo();
     $('hintBtn').onclick=()=> showHint();
     $('difficulty').onchange=(e)=> newGame({difficulty:e.target.value});
+    
+    // Stats modal functionality
+    function showStats() {
+      console.log('Showing stats...');
+      const statsModal = $('statsModal');
+      const overallStats = $('overallStats');
+      const recentGames = $('recentGames');
+      
+      if (!statsModal || !overallStats || !recentGames) {
+        console.error('Could not find required elements:', { statsModal, overallStats, recentGames });
+        return;
+      }
+      
+      const stats = getGameStats();
+      
+      // Update overall stats
+      if (overallStats) {
+        const totalGames = stats.stats?.totalGames || 0;
+        const wins = stats.stats?.wins || 0;
+        const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+        
+        overallStats.innerHTML = `
+          <div>Total Games: ${totalGames}</div>
+          <div>Wins: ${wins} (${winRate}%)</div>
+          <div>Current Streak: ${stats.stats?.currentStreak || 0}</div>
+          <div>Best Streak: ${stats.stats?.bestStreak || 0}</div>
+          <div>Best Time: ${stats.stats?.bestTime ? fmtTime(stats.stats.bestTime) : 'N/A'}</div>
+          <div>Best Moves: ${stats.stats?.bestMoves || 'N/A'}</div>
+          <div>Best Score: ${stats.stats?.bestScore || 0}</div>
+        `;
+      }
+      
+      // Update recent games
+      if (recentGames) {
+        recentGames.innerHTML = '';
+        const recent = Object.entries(stats.games || {})
+          .sort(([,a], [,b]) => (b.endTime || 0) - (a.endTime || 0))
+          .slice(0, 5);
+        
+        if (recent.length === 0) {
+          recentGames.innerHTML = '<div>No recent games</div>';
+        } else {
+          recent.forEach(([key, game]) => {
+            if (!game) return;
+            const gameEl = document.createElement('div');
+            gameEl.className = 'recent-game';
+            gameEl.innerHTML = `
+              <div>${game.endTime ? new Date(game.endTime).toLocaleString() : 'Unknown time'}</div>
+              <div>${game.difficulty || 'Unknown'} - ${game.outcome === 'win' ? '🏆' : '❌'}</div>
+              <div>${game.duration ? fmtTime(game.duration) : 'N/A'} - ${game.moves || 0} moves - Score: ${game.score || 0}</div>
+            `;
+            recentGames.appendChild(gameEl);
+          });
+        }
+      }
+      
+      // Show the modal
+      statsModal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+    
     $('setSeedBtn').onclick=()=>{ const v=$('seedInput').value.trim(); if(v){ const u=new URL(location.href); u.searchParams.set('seed', v); u.searchParams.set('difficulty', state.difficulty); history.replaceState({},'',u); newGame({difficulty:state.difficulty, seed:v}); } };
-    $('muteBtn').onclick=()=>{ const v=!AudioKit.isMuted(); AudioKit.setMuted(v); $('muteBtn').textContent=v?'🔇':'🔊'; };
+    // Initialize mute button state
+    $('muteBtn').textContent = AudioKit.isMuted() ? '🔇' : '🔊';
+    $('muteBtn').onclick = () => {
+      const v = !AudioKit.isMuted();
+      AudioKit.setMuted(v);
+      // Play feedback sound when toggling mute
+      if (!v) AudioKit.click();
+    };
     $('verifyBtn').onclick=()=> verifyInventory();
-    window.addEventListener('keydown', (e)=>{ if(e.repeat) return; const k=e.key.toLowerCase(); if(k==='n') $('newBtn').click(); else if(k==='d') $('dealBtn').click(); else if(k==='u') $('undoBtn').click(); else if(k==='r') $('redoBtn').click(); else if(k==='h') $('hintBtn').click(); else if(k==='v') $('verifyBtn').click(); });
+    window.addEventListener('keydown', (e)=>{
+      if(e.repeat) return;
+      const key = e.key.toLowerCase();
+      if(key === 'n') $('newBtn').click();
+      else if(key === 'd') $('dealBtn').click();
+      else if(key === 'u') $('undoBtn').click();
+      else if(key === 'r') $('redoBtn').click();
+      else if(key === 'h') $('hintBtn').click();
+      else if(key === 'v') $('verifyBtn').click();
+    });
+
+    // Initialize stats button and modal
+    function initStats() {
+      // Set up stats button click handler
+      const showStatsBtn = $('showStats');
+      const closeBtn = $('closeStats');
+      const statsModal = $('statsModal');
+      
+      if (showStatsBtn) {
+        showStatsBtn.onclick = showStats;
+        console.log('Stats button initialized');
+      } else {
+        console.error('Could not find showStats button');
+      }
+      
+      if (closeBtn && statsModal) {
+        closeBtn.onclick = () => {
+          statsModal.style.display = 'none';
+          document.body.style.overflow = 'auto';
+        };
+        
+        // Close when clicking outside the modal content
+        statsModal.onclick = (e) => {
+          if (e.target === statsModal) {
+            statsModal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+          }
+        };
+      }
+    }
 
     // ---------- Boot ----------
     function initFromURL(){ const url=new URL(location.href); const seed=url.searchParams.get('seed')||randSeed(); const diff=url.searchParams.get('difficulty')||'1-suit'; return {seed,difficulty:diff}; }
-    resize(); const init=initFromURL(); if(!loadGame()){ newGame(init); } requestAnimationFrame(tick);
+    resize(); const init=initFromURL(); if(!loadGame()){ newGame(init); } 
+    initStats(); // Initialize stats button and modal
+    requestAnimationFrame(tick);
   </script>
 </body>
 </html>

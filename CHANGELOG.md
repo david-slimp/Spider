@@ -1,4 +1,30 @@
 # Changelog
+## [0.0.4] - 2025-08-21
+### Added
+- Enhanced audio system with WebAudio API
+- New sound effects for card interactions (click on select, thud on drop)
+- Mute button with persistent state
+- Audio feedback for game actions
+- Improved stats modal with better layout and information display
+- Game statistics persistence across sessions
+- Visual feedback for audio state
+
+## [0.0.3] - 2025-08-21
+### Added
+- Comprehensive game statistics tracking (moves, time, score, outcomes)
+- Auto-save functionality to preserve game progress
+- Game recovery for interrupted sessions
+- Persistent storage of game history and best scores
+- Statistics tracking by difficulty level
+- Support for tracking incomplete/abandoned games
+- Statistics modal UI with overall game metrics
+- Recent game history display
+- Win/loss tracking and streak counters
+- Best time, moves, and score tracking
+- Visual indicators for game outcomes in history
+- Stats button in the main game interface
+- Proper error handling for game state management
+
 ## [0.0.2] - 2025-08-21
 ### Added
 - Version number to the game UI
