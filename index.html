@@ -30,10 +30,63 @@
     .win .modal{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:24px;min-width:340px;text-align:center;backdrop-filter:blur(10px)}
     .row{display:flex;gap:10px;justify-content:center;margin-top:14px}
     .seedbox{width:160px}
+    .hint-list {
+      max-height: 60vh;
+      overflow-y: auto;
+      margin: 15px 0;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+    }
+    
+    .hint-item {
+      padding: 10px;
+      margin: 5px 0;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .hint-item:hover {
+      background: rgba(34, 211, 238, 0.2);
+    }
+    
+    .hint-item.best {
+      border-left: 4px solid #22d3ee;
+      background: rgba(34, 211, 238, 0.15);
+    }
+    
+    .hint-details {
+      font-size: 0.9em;
+      color: #9fb2c7;
+      margin-top: 3px;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(1px);
+    }
   </style>
 </head>
 <body>
   <div id="hud">
+    <div class="card" style="margin-bottom: 10px">
+      <div>David's Spider - v0.0.2 // </div>
+      <div>Time: <span id="time">0:00</span></div>
+      <div>Moves: <span id="moves">0</span></div>
+      <div>Score: <span id="score">500</span></div>
+      <div>Deals: <span id="deals">5</span></div>
+      <div class="pill">Seed: <span id="seedLabel"></span></div>
+    </div>
     <div class="card" style="gap:8px">
       <button id="newBtn" title="N">New</button>
       <button id="replayBtn" title="Replay seed">Replay</button>
@@ -51,32 +104,29 @@
       <button id="muteBtn">🔊</button>
       <button id="verifyBtn" title="Check deck & invariants">Verify</button>
     </div>
-    <div class="card">
-      <div>Time: <span id="time">0:00</span></div>
-      <div>Moves: <span id="moves">0</span></div>
-      <div>Score: <span id="score">500</span></div>
-      <div>Deals: <span id="deals">5</span></div>
-      <div class="pill">Seed: <span id="seedLabel"></span></div>
-    </div>
-    <div class="card" style="gap:6px">
-      <span class="kbd">N</span>
-      <span class="kbd">D</span>
-      <span class="kbd">U / R</span>
-      <span class="kbd">H</span>
-    </div>
   </div>
 
   <canvas id="game"></canvas>
 
   <div id="status"><span class="pill" id="msg"></span></div>
 
-  <div id="winModal" class="win">
-    <div class="modal">
-      <h2 style="margin:0 0 8px 0">🦚 You Win!</h2>
-      <div>Time <b id="winTime">0:00</b> · Moves <b id="winMoves">0</b> · Score <b id="winScore">0</b></div>
-      <div class="row">
+  <div id="winModal" class="modal">
+    <div class="modal-content">
+      <h2>🦚 You Win!</h2>
+      <div>Time <b id="winTime">0:00</b> • Moves <b id="winMoves">0</b> • Score <b id="winScore">0</b></div>
+      <div class="modal-buttons">
         <button id="playAgain">Play again</button>
         <button id="shareSeed">Copy share link</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="hintModal" class="modal">
+    <div class="modal-content">
+      <h2>💡 Available Moves</h2>
+      <div id="hintList" class="hint-list"></div>
+      <div class="modal-buttons">
+        <button id="closeHint">Close</button>
       </div>
     </div>
   </div>
@@ -160,6 +210,9 @@
       state.tableau=deal.tableau; state.stock=deal.stock; state.dealsRemaining=5; state.foundations=0;
       state.moves=0; state.score=500; state.history=[]; state.redo=[]; state.message=''; state.hint=null; state.won=false;
       state.startTime=now(); state.elapsedMs=0; state.running=true; updateUI(); draw();
+      // Reset and start the timer
+      lastTick = now();
+      tick();
       saveGame();
     }
 
@@ -232,10 +285,35 @@
       ctx.globalAlpha=.18; ctx.strokeStyle='rgba(14,165,233,.6)'; for(let i=0;i<8;i++){ ctx.beginPath(); const cx=x+w/2, cy=y+h/2; const r=w*0.5*(1-i/8); ctx.ellipse(cx, cy, r, r*0.55, 0, 0, Math.PI*2); ctx.stroke(); } ctx.globalAlpha=1;
     }
 
-    function drawCard(x,y,card){ const r=12; ctx.save(); ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=12; ctx.shadowOffsetY=8; if(card.faceUp){ drawRounded(x,y,cardW,cardH,r); ctx.fillStyle='rgba(17,24,39,.85)'; ctx.fill(); const grad=ctx.createLinearGradient(x,y,x,y+cardH); grad.addColorStop(0,'rgba(255,255,255,.12)'); grad.addColorStop(1,'rgba(255,255,255,.02)'); ctx.fillStyle=grad; ctx.fill(); ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.stroke(); // feather corner
-        ctx.save(); ctx.globalAlpha=.25; drawPeacockGlass(x+6,y+6,cardW-12,cardH-12); ctx.restore();
-        // Rank + suit
-        ctx.font=`bold ${Math.floor(cardW*0.24)}px system-ui`; ctx.textBaseline='top'; ctx.fillStyle = RED.has(card.suit)?'#fca5a5':'#e5e7eb'; const rankStr=['A','2','3','4','5','6','7','8','9','10','J','Q','K'][card.rank-1]; ctx.fillText(rankStr, x+10, y+8); ctx.font=`bold ${Math.floor(cardW*0.28)}px system-ui`; ctx.textBaseline='alphabetic'; ctx.fillText(card.suit, x+cardW- Math.floor(cardW*0.28) - 8, y+cardH-12);
+    function drawCard(x,y,card){ const r=12; ctx.save(); ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=12; ctx.shadowOffsetY=8; if(card.faceUp){ drawRounded(x,y,cardW,cardH,r); ctx.fillStyle='#ffffff'; // White background for face-up cards
+        ctx.fill();
+        // Add subtle border
+        ctx.strokeStyle='rgba(0,0,0,0.1)'; 
+        ctx.lineWidth=1; 
+        ctx.stroke();
+        // Add subtle shadow inside the card
+        const grad=ctx.createLinearGradient(x,y,x,y+cardH);
+        grad.addColorStop(0,'rgba(0,0,0,.03)');
+        grad.addColorStop(1,'rgba(0,0,0,.01)');
+        ctx.fillStyle=grad;
+        drawRounded(x,y,cardW,cardH,r);
+        ctx.fill();
+        // Rank + suit with proper colors
+        const rankStr = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'][card.rank-1];
+        const isRed = RED.has(card.suit);
+        const textColor = isRed ? '#cc0000' : '#000000';
+        
+        // Draw rank (top left)
+        ctx.font = `bold ${Math.floor(cardW*0.24)}px system-ui`;
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = textColor;
+        ctx.fillText(rankStr, x+10, y+8);
+        
+        // Draw suit (bottom right)
+        ctx.font = `bold ${Math.floor(cardW*0.28)}px system-ui`;
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = textColor;
+        ctx.fillText(card.suit, x+cardW-Math.floor(cardW*0.28)-8, y+cardH-12);
       } else { drawRounded(x,y,cardW,cardH,r); const g=ctx.createLinearGradient(x,y,x+cardW,y+cardH); g.addColorStop(0,'#1f2937'); g.addColorStop(1,'#0b1220'); ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke(); ctx.save(); ctx.clip(); ctx.globalAlpha=.22; // feather stripes
         for(let i=0;i<cardW;i+=8){ ctx.fillStyle=i%16? 'rgba(124,58,237,.35)':'rgba(14,165,233,.35)'; ctx.fillRect(x+i,y,2,cardH); } ctx.restore(); }
       ctx.restore(); }
@@ -305,8 +383,135 @@
     function flashMsg(m){ state.message=m; const el=$('msg'); el.textContent=m; el.style.opacity=1; el.animate([{opacity:1},{opacity:0}],{duration:1600, fill:'forwards'}); }
 
     // ---------- Hints ----------
-    function computeHint(){ let best=null, score=-1; for(let from=0;from<10;from++){ const col=state.tableau[from]; if(!col.length||!top(col).faceUp) continue; for(let start=0; start<col.length; start++){ if(!col[start].faceUp) continue; let ok=true; for(let i=col.length-1;i>start;i--){ const a=col[i], b=col[i-1]; if(!(a.faceUp&&b.faceUp&&a.rank+1===b.rank&&a.suit===b.suit)){ ok=false; break; } } if(!ok) continue; const head=col[start]; for(let to=0;to<10;to++){ if(to===from) continue; const destTop=top(state.tableau[to]); if(canDrop(head, destTop)){ let s=0; if(start>0 && !col[start-1].faceUp) s+=3; if(destTop && destTop.suit===head.suit && destTop.rank===head.rank+1) s+=2; if(col.length===start+1 && col.length-1===0) s+=2; if(s>score){ score=s; best={from,start,to}; } } } } } return best; }
-    function showHint(){ const h=computeHint(); state.hint=h; draw(); if(h){ flashMsg(`Hint: Move from ${h.from+1} to ${h.to+1}`); setTimeout(()=>{ state.hint=null; draw(); }, 1400); } else { flashMsg('No moves found'); } }
+    function computeHint(){
+      const hints = [];
+      for(let from=0; from<10; from++) {
+        const col = state.tableau[from];
+        if(!col.length || !top(col).faceUp) continue;
+        
+        for(let start=0; start<col.length; start++) {
+          if(!col[start].faceUp) continue;
+          
+          // Check if this is a valid run (sequence of same-suit descending cards)
+          let ok = true;
+          for(let i=col.length-1; i>start; i--) {
+            const a = col[i], b = col[i-1];
+            if(!(a.faceUp && b.faceUp && a.rank+1 === b.rank && a.suit === b.suit)) {
+              ok = false;
+              break;
+            }
+          }
+          if(!ok) continue;
+          
+          const head = col[start];
+          
+          // Check all possible destination columns
+          for(let to=0; to<10; to++) {
+            if(to === from) continue;
+            const destTop = top(state.tableau[to]);
+            if(canDrop(head, destTop)) {
+              let score = 0;
+              const reasons = [];
+              
+              // Bonus for revealing a face-down card
+              if(start > 0 && !col[start-1].faceUp) {
+                score += 3;
+                reasons.push('Reveals a hidden card');
+              }
+              
+              // Bonus for building same-suit sequence
+              if(destTop && destTop.suit === head.suit && destTop.rank === head.rank+1) {
+                score += 2;
+                reasons.push('Builds same-suit sequence');
+              }
+              
+              // Bonus for creating an empty column
+              if(col.length === start+1 && state.tableau[to].length === 0) {
+                score += 2;
+                reasons.push('Creates an empty column');
+              }
+              
+              hints.push({
+                from, start, to,
+                score,
+                cardCount: col.length - start,
+                reasons: reasons.length ? reasons : ['Basic move'],
+                headRank: head.rank,
+                headSuit: head.suit
+              });
+            }
+          }
+        }
+      }
+      
+      // Sort hints by score (highest first) and then by number of cards moved (fewer first)
+      return hints.sort((a, b) => b.score - a.score || a.cardCount - b.cardCount);
+    }
+    
+    function showHint(){
+      const hints = computeHint();
+      const hintModal = $('hintModal');
+      const hintList = $('hintList');
+      
+      // Clear previous hints
+      hintList.innerHTML = '';
+      
+      if(hints.length === 0) {
+        hintList.innerHTML = '<div class="hint-item">No moves available</div>';
+        hintModal.style.display = 'flex';
+        return;
+      }
+      
+      // Add each hint to the list
+      hints.forEach((hint, index) => {
+        const fromCol = hint.from + 1;
+        const toCol = hint.to + 1;
+        const cardCount = hint.cardCount > 1 ? ` (${hint.cardCount} cards)` : '';
+        const rankNames = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+        const rankName = rankNames[hint.headRank - 1];
+        
+        const hintElement = document.createElement('div');
+        hintElement.className = `hint-item ${index === 0 ? 'best' : ''}`;
+        hintElement.innerHTML = `
+          <div><b>${index + 1}.</b> Move from column ${fromCol} to ${toCol}${cardCount}</div>
+          <div class="hint-details">
+            Moves ${hint.headSuit}${rankName}${hint.cardCount > 1 ? ' + ' + (hint.cardCount - 1) + ' more' : ''}<br>
+            ${hint.reasons.join(' • ')}
+          </div>
+        `;
+        
+        // Click handler to execute the move
+        hintElement.onclick = () => {
+          doMove(hint.from, hint.start, hint.to);
+          hintModal.style.display = 'none';
+        };
+        
+        hintList.appendChild(hintElement);
+      });
+      
+      // Show the best hint visually on the board
+      state.hint = hints[0];
+      draw();
+      
+      // Show the modal
+      hintModal.style.display = 'flex';
+    }
+    
+    // Close hint modal when clicking the close button
+    $('closeHint').onclick = () => {
+      $('hintModal').style.display = 'none';
+      state.hint = null;
+      draw();
+    };
+    
+    // Close hint modal when clicking outside the content
+    $('hintModal').onclick = (e) => {
+      if (e.target === $('hintModal')) {
+        $('hintModal').style.display = 'none';
+        state.hint = null;
+        draw();
+      }
+    };
 
     // ---------- Verification ----------
     function verifyInventory(){
