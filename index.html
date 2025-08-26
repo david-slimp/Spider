@@ -25,6 +25,11 @@
     .pill{padding:6px 10px;border-radius:999px;border:1px dashed var(--border);font-size:12px;color:var(--muted)}
     #status{position:fixed;left:16px;right:16px;bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:10}
     #game{position:fixed;inset:0}
+    #difficulty{ margin:0 8px; padding:2px 4px; border-radius:4px; border:1px solid #666; background:#222; color:#fff; }
+    .aces-toggle { display: inline-flex; align-items: center; margin: 0 8px; cursor: pointer; user-select: none; }
+    .aces-toggle input { margin-right: 4px; }
+    .aces-toggle:hover { color: #ffd700; }
+    #seedInput{ width:100px; margin:0 8px; padding:2px 4px; border-radius:4px; border:1px solid #666; background:#222; color:#fff; }
     .kbd{padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.06);font-size:12px}
     .win{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:20}
     .win .modal-content { background:#2a2a2a; padding:24px; border-radius:12px; max-width:90%; max-height:90%; overflow-y:auto; position:relative; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
@@ -235,6 +240,10 @@
         <option value="2-suit">2-suit</option>
         <option value="4-suit">4-suit</option>
       </select>
+      <label class="aces-toggle">
+        <input type="checkbox" id="includeAces">
+        <span>Include Aces</span>
+      </label>
       <input id="seedInput" class="seedbox" type="text" placeholder="custom seed"/>
       <button id="setSeedBtn">Set Seed</button>
       <button id="muteBtn">🔊</button>
@@ -315,6 +324,79 @@
       const ctx = new (window.AudioContext||window.webkitAudioContext)(); 
       let muted = localStorage.getItem('audioMuted') === 'true' || false;
       
+      // Play a triumphant fanfare sound for foundation completion (one octave lower)
+      const playFanfare = () => {
+        if (muted) return;
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        // Lowered frequencies by one octave (half the original frequencies)
+        osc1.frequency.setValueAtTime(440, now);   // Was 880 (A5), now A4
+        osc2.frequency.setValueAtTime(554.365, now); // Was ~1109 (C#6), now C#5
+        
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.15, now + 0.1);
+        gain.gain.linearRampToValueAtTime(0, now + 1.2);
+        
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 1.2);
+        osc2.stop(now + 1.2);
+      };
+      
+      // Play a card shuffle sound
+      const playShuffle = () => {
+        if (muted) return;
+        const now = ctx.currentTime;
+        const bufferSize = ctx.sampleRate * 0.5; // 0.5 seconds of audio
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        
+        // Generate white noise
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+        
+        // Create a bandpass filter to make it sound more like cards
+        const bandpass = ctx.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.value = 800;
+        bandpass.Q.value = 1.0;
+        
+        // Create a lowpass filter to soften the sound
+        const lowpass = ctx.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = 2000;
+        
+        // Create gain envelope
+        const gainNode = ctx.createGain();
+        gainNode.gain.setValueAtTime(0.5, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        
+        // Connect nodes
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+        noise.connect(bandpass);
+        bandpass.connect(lowpass);
+        lowpass.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        // Play with slight variations
+        for (let i = 0; i < 3; i++) {
+          const startTime = now + (i * 0.12);
+          noise.start(startTime);
+          noise.stop(startTime + 0.5);
+        }
+      };
+      
       // Base sound generator
       function generateSound(freq=880, len=0.06, type='triangle', gain=0.05, click=false) { 
         if (muted) return null;
@@ -339,7 +421,7 @@
         o.start();
         o.stop(ctx.currentTime + len);
         return o;
-      }
+      };
       
       // Sound effects
       function blip(freq=880, len=0.06, type='triangle', gain=0.05) { 
@@ -382,25 +464,33 @@
           if (ctx.state === 'suspended') {
             ctx.resume();
           }
-        } 
+        },
+        fanfare: playFanfare,
+        shuffle: playShuffle
       };
     })();
 
     // ---------- Engine State ----------
     const state = {
-      difficulty:'1-suit', seed:'', rng:null,
+      difficulty:'1-suit', seed:'', rng:null, includeAces: false,
       tableau:[[],[],[],[],[],[],[],[],[],[]], stock:[], dealsRemaining:5, foundations:0,
       moves:0, score:500, startTime:0, elapsedMs:0, running:true,
       history:[], redo:[], message:'', hint:null, won:false, foundationsCards:[]
     };
 
-    function createDeck(difficulty){
+    function createDeck(difficulty, includeAces = false){
       let suits;
       if(difficulty==='1-suit') suits=Array(8).fill('♠');
       else if(difficulty==='2-suit') suits=[...Array(4).fill('♠'), ...Array(4).fill('♥')];
       else suits=['♠','♥','♦','♣','♠','♥','♦','♣'];
-      const deck=[]; let id=0; for(const s of suits){ for(let r=1;r<=13;r++){ deck.push({id:id++, suit:s, rank:r, faceUp:false}); } }
-      return deck; // 104
+      const deck=[]; let id=0; 
+      const minRank = includeAces ? 1 : 2; // Start from Ace (1) or 2 based on setting
+      for(const s of suits){ 
+        for(let r=minRank;r<=13;r++){ 
+          deck.push({id:id++, suit:s, rank:r, faceUp:false}); 
+        } 
+      }
+      return deck;
     }
 
     function initialDeal(deck){ const cols=Array.from({length:10},()=>[]); let idx=0; for(let pass=0;pass<6;pass++){ for(let c=0;c<10;c++){ if(pass===5 && c>=4) continue; const card=deck[idx++]; cols[c].push(card); } } for(let c=0;c<10;c++){ cols[c][cols[c].length-1].faceUp=true; } const stock=deck.slice(idx); return {tableau:cols, stock}; }
@@ -409,7 +499,18 @@
 
     function canDrop(tailHead, destTop){ if(!destTop) return true; return tailHead.rank+1===destTop.rank; }
 
-    function tryComplete(col){ if(col.length<13) return null; const L=col.length; const suit=col[L-1].suit; for(let i=0;i<13;i++){ const card=col[L-1-i]; if(!(card.faceUp && card.suit===suit && card.rank===(1+i))) return null; } return col.splice(L-13,13);
+    function tryComplete(col, includeAces = false){ 
+      const minRank = includeAces ? 1 : 2;
+      const expectedLength = 14 - minRank; // 13 for Aces included, 12 for Aces excluded
+      if(col.length < expectedLength) return null; 
+      const L = col.length;
+      const suit = col[L-1].suit; 
+      for(let i=0; i<expectedLength; i++){ 
+        const card = col[L-1-i]; 
+        if(!(card.faceUp && card.suit === suit && card.rank === (minRank + i))) 
+          return null; 
+      } 
+      return col.splice(L-expectedLength, expectedLength);
     }
 
     function removeFromFoundations(cards){
@@ -417,9 +518,9 @@
       state.foundationsCards = state.foundationsCards.filter(c=>!set.has(c.id));
     }
 
-    function completeTopRun(colIndex){
+    function completeTopRun(colIndex, includeAces = false){
       const col = state.tableau[colIndex];
-      const rem = tryComplete(col);
+      const rem = tryComplete(col, includeAces);
       if(!rem) return false;
       let turned = null;
       if(col.length && !top(col).faceUp){
@@ -430,18 +531,22 @@
       state.foundations++;
       state.history.push({t:'complete', col:colIndex, cards:rem, turned});
       state.score += 100;
-      AudioKit.blip(1000,0.08,'sine',0.06);
+      AudioKit.fanfare();
       return true;
     }
 
     // ---------- Game actions ----------
-    function newGame({difficulty=state.difficulty, seed=randSeed()}={}){
+    function newGame({difficulty=state.difficulty, seed=randSeed(), includeAces=state.includeAces}={}){
       // Track the new game in statistics
       const suitCount = difficulty === '1-suit' ? 1 : difficulty === '2-suit' ? 2 : 4;
       trackGameStart({ suitCount, seed, difficulty });
       
-      state.difficulty=difficulty; state.seed=seed; state.rng=mulberry32(hashSeed(difficulty+':'+seed));
-      const deck=createDeck(difficulty); shuffle(deck, state.rng);
+      state.difficulty=difficulty; 
+      state.seed=seed; 
+      state.includeAces = includeAces;
+      state.rng=mulberry32(hashSeed(difficulty+':'+seed));
+      const deck=createDeck(difficulty, includeAces); 
+      shuffle(deck, state.rng);
       const deal=initialDeal(deck);
       state.tableau=deal.tableau; state.stock=deal.stock; state.dealsRemaining=5; state.foundations=0;
       state.moves=0; state.score=500; state.history=[]; state.redo=[]; state.message=''; state.hint=null; state.won=false;
@@ -454,18 +559,40 @@
     }
 
     function dealRow(){ 
-      if(state.dealsRemaining<=0){ flashMsg('No deals left'); return false; }
+      if(state.dealsRemaining<=0 && state.stock.length > 0){ flashMsg('No deals left'); return false; }
       for(let c=0;c<10;c++){ if(state.tableau[c].length===0){ flashMsg('Fill empty columns before dealing'); return false; } }
       
       const dealt=[];
-      for(let c=0;c<10;c++){
-        const card=state.stock.shift();
-        card.faceUp=true;
-        state.tableau[c].push(card);
-        dealt.push(card);
-      }
+      const cardsToDeal = Math.min(state.stock.length, 10);
       
-      state.dealsRemaining--;
+      // If this is the final deal with remaining cards, allow it even with no deals remaining
+      const isFinalDeal = state.dealsRemaining === 1 && state.stock.length > 0 && state.stock.length < 10;
+      
+      if (isFinalDeal) {
+        // For the final deal, distribute remaining cards to the first N columns
+        for(let c=0; c<state.stock.length; c++) {
+          const card = state.stock.shift();
+          card.faceUp = true;
+          state.tableau[c].push(card);
+          dealt.push(card);
+        }
+        state.dealsRemaining = 0; // No more deals after this
+      } else {
+        // Normal deal - 10 cards or remaining cards if less than 10
+        for(let c=0; c<cardsToDeal; c++){
+          const card = state.stock.shift();
+          if(card) {
+            card.faceUp = true;
+            state.tableau[c].push(card);
+            dealt.push(card);
+          }
+        }
+        
+        // Only decrement deals if we actually dealt a full row (10 cards)
+        if (cardsToDeal === 10) {
+          state.dealsRemaining--;
+        }
+      }
       state.history.push({t:'deal', dealt});
       state.redo=[];
       state.moves++;
@@ -480,13 +607,13 @@
       
       // Check for completion after dealing
       for(let c=0;c<10;c++){
-        completeTopRun(c);
+        completeTopRun(c, state.includeAces);
       }
       
       updateUI();
       draw();
       saveGame();
-      AudioKit.blip(420,0.05);
+      AudioKit.shuffle();
       
       return true;
     }
@@ -690,10 +817,82 @@
         updateUI(); draw(); return true;
       }catch{ return false; }
     }
+    // ---------- Scroll State ----------
+    let scrollY = 0;
+    const SCROLL_SPEED = 60; // Pixels per wheel tick for smoother scrolling
+    const MIN_SCROLL = 0;
+    let maxScroll = 0;
+    let isScrolling = false;
+
     // ---------- Rendering ----------
     const canvas=$('game'); const ctx=canvas.getContext('2d'); let W=0,H=0, cardW=96, cardH=134, gap=14, margin=26, topArea=160, overlapUp=26, overlapDown=32;
 
-    function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; W=canvas.width; H=canvas.height; const availW=W - margin*2 - gap*9; cardW=clamp(Math.floor(availW/10), 68, 116); cardH=Math.floor(cardW*1.4); topArea=Math.max(150, cardH+40); overlapUp=Math.floor(cardH*0.24); overlapDown=Math.floor(cardH*0.30); draw(); }
+    function handleWheel(e) {
+      e.preventDefault();
+      // Use the browser's native smooth scrolling behavior
+      const delta = e.deltaY * 0.5; // Reduce the delta for smoother scrolling
+      scrollY = clamp(scrollY + delta, MIN_SCROLL, maxScroll);
+      
+      // Use requestAnimationFrame for smoother animation
+      if (!isScrolling) {
+        isScrolling = true;
+        requestAnimationFrame(() => {
+          draw();
+          isScrolling = false;
+        });
+      }
+    }
+
+    function resize(){ 
+      canvas.width=window.innerWidth; 
+      canvas.height=window.innerHeight; 
+      W=canvas.width; 
+      H=canvas.height; 
+      const availW=W - margin*2 - gap*9; 
+      cardW=clamp(Math.floor(availW/10), 68, 116); 
+      cardH=Math.floor(cardW*1.4); 
+      topArea=Math.max(150, cardH+40); 
+      overlapUp=Math.floor(cardH*0.24); 
+      overlapDown=Math.floor(cardH*0.30); 
+      
+      // Calculate max scroll based on the tallest column with extra space at bottom
+      maxScroll = Math.max(0, ...state.tableau.map(col => {
+        const totalHeight = col.reduce((sum, card, i) => 
+          sum + (i === 0 ? overlapDown : (col[i-1].faceUp ? overlapDown : overlapUp)), 0);
+        // Add extra space (2x viewport height) to allow for more scrolling room
+        return Math.max(0, (totalHeight + H) - (H - topArea - margin));
+      }));
+      // Ensure scroll position is within bounds
+      scrollY = clamp(scrollY, MIN_SCROLL, maxScroll);
+      
+      draw(); 
+    }
+    
+    // Add event listeners for smooth scrolling
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    
+    // Enable touch events for mobile
+    let touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1) {
+        const touchY = e.touches[0].clientY;
+        const delta = touchStartY - touchY;
+        scrollY = clamp(scrollY + delta * 1.5, MIN_SCROLL, maxScroll);
+        touchStartY = touchY;
+        if (!isScrolling) {
+          isScrolling = true;
+          requestAnimationFrame(() => {
+            draw();
+            isScrolling = false;
+          });
+        }
+        e.preventDefault();
+      }
+    }, { passive: false });
     window.addEventListener('resize', resize);
 
     const colX = (i)=> margin + i*(cardW+gap);
@@ -790,8 +989,31 @@
       ctx.restore(); 
     }
 
-    function draw(){ if(!ctx) return; ctx.clearRect(0,0,W,H); // stock
-      const sx=margin, sy=pileY(); drawRounded(sx,sy,cardW,cardH,12); ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); ctx.save(); ctx.globalAlpha=.6; ctx.fillStyle='rgba(255,255,255,.2)'; for(let i=0;i<Math.min(state.dealsRemaining*10,50); i+=10){ ctx.fillRect(sx+6+i/50*8, sy+6, cardW-12, cardH-12);} ctx.restore(); ctx.fillStyle='var(--muted)'; ctx.font='12px system-ui'; ctx.fillText('Stock', sx, sy-6);
+    function draw(){ 
+      if(!ctx) return; 
+      ctx.clearRect(0,0,W,H);
+      
+      // Apply scroll transform
+      ctx.save();
+      ctx.translate(0, -scrollY);
+      
+      // stock
+      const sx=margin, sy=pileY(); 
+      drawRounded(sx,sy,cardW,cardH,12); 
+      ctx.fillStyle='rgba(255,255,255,.06)'; 
+      ctx.fill(); 
+      ctx.strokeStyle='rgba(255,255,255,.18)'; 
+      ctx.stroke(); 
+      ctx.save(); 
+      ctx.globalAlpha=.6; 
+      ctx.fillStyle='rgba(255,255,255,.2)'; 
+      for(let i=0;i<Math.min(state.dealsRemaining*10,50); i+=10){ 
+        ctx.fillRect(sx+6+i/50*8, sy+6, cardW-12, cardH-12);
+      } 
+      ctx.restore(); 
+      ctx.fillStyle='var(--muted)'; 
+      ctx.font='12px system-ui'; 
+      ctx.fillText('Stock', sx, sy-6);
       // foundations: 8 slots
       const fx=W - margin - cardW*3, fy=sy; const slotW=cardW, slotH=cardH; for(let i=0;i<8;i++){ const x=fx + (i%4)*(slotW+12), y=fy + Math.floor(i/4)*(slotH+16); drawRounded(x,y,slotW,slotH,12); ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke(); if(i<state.foundations){ ctx.save(); ctx.globalAlpha=.55; ctx.fillStyle='rgba(34,211,238,.35)'; ctx.fillRect(x+6,y+6,slotW-12,slotH-12); ctx.restore(); }
         // peacock eye motif
@@ -828,10 +1050,33 @@
         }
         if(state.hint && state.hint.to===c){ ctx.save(); ctx.strokeStyle='rgba(20,184,166,.9)'; ctx.lineWidth=3; drawRounded(x-4,y0-4,cardW+8,cardH+8,14); ctx.stroke(); ctx.restore(); }
       }
-      // drag ghost
-      if(drag.active){ let yy=drag.y - drag.grabOffsetY; for(const card of drag.stack){ drawCard(drag.x - drag.grabOffsetX, yy, card); yy += overlapDown; } }
-      // confetti particles
-      if(confetti.length){ for(const p of confetti){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=1; ctx.save(); ctx.globalAlpha=Math.max(0, p.life/80); ctx.fillStyle=p.color; ctx.translate(p.x,p.y); ctx.rotate(p.rot+=(p.spin)); ctx.fillRect(-4,-4,8,8); ctx.restore(); } confetti = confetti.filter(p=>p.life>0); requestAnimationFrame(draw); }
+      // drag ghost (not affected by scroll)
+      ctx.restore(); // Restore transform for drag ghost
+      if(drag.active){ 
+        let yy=drag.y - drag.grabOffsetY; 
+        for(const card of drag.stack){ 
+          drawCard(drag.x - drag.grabOffsetX, yy, card); 
+          yy += overlapDown; 
+        } 
+      }
+      // confetti particles (not affected by scroll)
+      if(confetti.length){ 
+        for(const p of confetti){ 
+          p.x+=p.vx; 
+          p.y+=p.vy; 
+          p.vy+=0.12; 
+          p.life-=1; 
+          ctx.save(); 
+          ctx.globalAlpha=Math.max(0, p.life/80); 
+          ctx.fillStyle=p.color; 
+          ctx.translate(p.x,p.y); 
+          ctx.rotate(p.rot+=(p.spin)); 
+          ctx.fillRect(-4,-4,8,8); 
+          ctx.restore(); 
+        } 
+        confetti = confetti.filter(p=>p.life>0); 
+        requestAnimationFrame(draw); 
+      }
     }
 
     // ---------- Input / Drag ----------
@@ -887,15 +1132,33 @@
       $('score').textContent=state.score;
       $('deals').textContent=state.dealsRemaining;
       $('seedLabel').textContent=state.seed;
+      
       const hasEmpty = state.tableau.some(c=>c.length===0);
-      const enoughStock = state.stock.length >= 10; // safety: one full row available
-      const dealDisabled = hasEmpty || state.dealsRemaining<=0 || !enoughStock;
+      const isFinalDeal = state.dealsRemaining === 1 && state.stock.length > 0 && state.stock.length < 10;
+      const enoughStock = state.stock.length >= 10 || isFinalDeal; // Allow final deal with < 10 cards
+      const dealDisabled = hasEmpty || state.dealsRemaining<=0 || (!enoughStock && !isFinalDeal);
+      
       $('dealBtn').disabled = dealDisabled;
-      $('dealBtn').title = state.dealsRemaining<=0 ? 'No deals left' : (!enoughStock ? 'Not enough cards in stock' : (hasEmpty ? 'Fill empty columns before dealing' : 'Deal next row'));
+      
+      // Update button title based on state
+      let title = 'Deal next row';
+      if (state.dealsRemaining <= 0) {
+        title = 'No deals left';
+      } else if (hasEmpty) {
+        title = 'Fill empty columns before dealing';
+      } else if (isFinalDeal) {
+        title = 'Deal final cards';
+      } else if (state.stock.length < 10) {
+        title = 'Not enough cards in stock';
+      }
+      $('dealBtn').title = title;
+      
+      // Update reason message
       const reasonEl = $('dealReason');
-      if(dealDisabled){
+      if(dealDisabled && !isFinalDeal) {
         reasonEl.style.display='inline-block';
-        reasonEl.textContent = state.dealsRemaining<=0 ? 'No deals left' : (!enoughStock ? 'Deal blocked: stock < 10' : 'Deal blocked: empty column(s)');
+        reasonEl.textContent = state.dealsRemaining<=0 ? 'No deals left' : 
+                             (hasEmpty ? 'Deal blocked: empty column(s)' : 'Deal blocked: not enough cards');
       } else {
         reasonEl.style.display='none';
       }
@@ -1063,17 +1326,38 @@
     // ---------- Win modal ----------
     let confetti=[]; function burst(){ for(let i=0;i<180;i++){ confetti.push({ x: W/2, y: topArea+cardH/2, vx:(Math.random()*4-2), vy:(Math.random()*-5-2), rot:0, spin:(Math.random()*.2-.1), life: 80+(Math.random()*40|0), color:`hsl(${(Math.random()*360|0)},80%,60%)`}); } draw(); }
     function showWin(){ $('winTime').textContent=fmtTime(state.elapsedMs); $('winMoves').textContent=state.moves; $('winScore').textContent=state.score; $('winModal').style.display='grid'; burst(); }
-    $('playAgain').onclick=()=>{ $('winModal').style.display='none'; newGame({difficulty:state.difficulty}); };
+    $('playAgain').onclick=()=>{ 
+      $('winModal').style.display='none'; 
+      newGame({
+        difficulty: state.difficulty,
+        includeAces: state.includeAces
+      }); 
+    };
     $('shareSeed').onclick=async()=>{ const url=new URL(location.href); url.searchParams.set('seed', state.seed); url.searchParams.set('difficulty', state.difficulty); try{ await navigator.clipboard.writeText(url.toString()); flashMsg('Link copied'); }catch{ flashMsg(url.toString()); } };
 
     // ---------- Controls ----------
-    $('newBtn').onclick=()=> newGame({difficulty:state.difficulty});
-    $('replayBtn').onclick=()=> newGame({difficulty:state.difficulty, seed:state.seed});
+    $('newBtn').onclick=()=> newGame({
+      difficulty: state.difficulty,
+      includeAces: $('includeAces').checked
+    });
+    $('replayBtn').onclick=()=> newGame({
+      difficulty: state.difficulty, 
+      seed: state.seed,
+      includeAces: state.includeAces
+    });
     $('dealBtn').onclick=()=> dealRow();
     $('undoBtn').onclick=()=> undo();
     $('redoBtn').onclick=()=> redo();
     $('hintBtn').onclick=()=> showHint();
-    $('difficulty').onchange=(e)=> newGame({difficulty:e.target.value});
+    $('difficulty').onchange=(e)=> newGame({
+      difficulty: e.target.value,
+      includeAces: $('includeAces').checked
+    });
+    
+    $('includeAces').onchange=(e)=> newGame({
+      difficulty: state.difficulty,
+      includeAces: e.target.checked
+    });
     
     // Stats modal functionality
     function showStats() {
@@ -1135,7 +1419,20 @@
       document.body.style.overflow = 'hidden';
     }
     
-    $('setSeedBtn').onclick=()=>{ const v=$('seedInput').value.trim(); if(v){ const u=new URL(location.href); u.searchParams.set('seed', v); u.searchParams.set('difficulty', state.difficulty); history.replaceState({},'',u); newGame({difficulty:state.difficulty, seed:v}); } };
+    $('setSeedBtn').onclick=()=>{ 
+      const v=$('seedInput').value.trim(); 
+      if(v){ 
+        const u=new URL(location.href); 
+        u.searchParams.set('seed', v); 
+        u.searchParams.set('difficulty', state.difficulty);
+        history.replaceState({},'',u); 
+        newGame({
+          difficulty: state.difficulty, 
+          seed: v,
+          includeAces: $('includeAces').checked
+        }); 
+      } 
+    };
     // Initialize mute button state
     $('muteBtn').textContent = AudioKit.isMuted() ? '🔇' : '🔊';
     $('muteBtn').onclick = () => {
