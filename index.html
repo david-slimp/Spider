@@ -17,14 +17,59 @@
       color:var(--text);
       overflow:hidden;
     }
-    #hud{position:fixed;left:16px;right:16px;top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;z-index:10; font-size: 1.5em;}
-    .card{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:8px 10px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+    #hud {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+      font-size: 1.5em;
+    }
+    
+    #top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 8px 15px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+    
+    #menu-bar {
+      position: fixed;
+      left: 16px;
+      top: 100px;
+      width: 170px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 10;
+    }
+    
+    .card {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 8px 10px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
     button,select,input[type="text"]{appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);padding:10px 14px;border-radius:12px;font-weight:600;cursor:pointer; font-size: 1.125em;}
     button:hover{transform:translateY(-1px)}
     button:disabled{opacity:.5;cursor:not-allowed}
     .pill{padding:9px 15px;border-radius:999px;border:1px dashed var(--border);font-size:18px;color:var(--muted)}
     #status{position:fixed;left:16px;right:16px;bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:10}
-    #game{position:fixed;inset:0}
+    #game{position:fixed;left:186px;right:0;top:0;bottom:0;overflow:hidden}
     #difficulty{ margin:0 8px; padding:2px 4px; border-radius:4px; border:1px solid #666; background:#222; color:#fff; }
     .aces-toggle { display: inline-flex; align-items: center; margin: 0 8px; cursor: pointer; user-select: none; }
     .aces-toggle input { margin-right: 4px; }
@@ -217,7 +262,7 @@
 </head>
 <body>
   <div id="hud">
-    <div class="card" style="margin-bottom: 10px; width: 100%; display: flex; justify-content: space-between; align-items: center;">
+    <div id="top-bar">
       <div style="display: flex; gap: 15px; align-items: center;">
         <div>David's Spider - v0.0.3</div>
         <div>Time: <span id="time">0:00</span></div>
@@ -227,29 +272,41 @@
         <div style="color: #22c55e; font-weight: 600;">Sets: <span id="sets-counter" style="color: white;">0</span></div>
         <div class="pill">Seed: <span id="seedLabel"></span></div>
       </div>
-      <button id="showStats" style="margin-left: auto;">📊 Stats</button>
+      <button id="showStats">📊 Stats</button>
     </div>
-    <div class="card" style="gap:8px; transform: scale(0.75); transform-origin: left top; margin-top: -10px;">
-      <button id="newBtn" title="N">New</button>
-      <button id="replayBtn" title="Replay seed">Replay</button>
-      <button id="undoBtn" title="U">Undo</button>
-      <button id="redoBtn" title="R">Redo</button>
-      <button id="hintBtn" title="H">Hint</button>
-      <button id="dealBtn" title="D">Deal</button> <span id="dealReason" class="pill" style="display:none"></span>
-      <select id="difficulty">
+  </div>
+  
+  <div id="menu-bar">
+    <div class="card" style="padding: 8px; display: flex; flex-direction: column; gap: 4px;">
+      <button id="newBtn" title="N" style="width: 100%; text-align: left;">New Game</button>
+      <button id="replayBtn" title="Replay seed" style="width: 100%; text-align: left;">Replay</button>
+      <button id="undoBtn" title="U" style="width: 100%; text-align: left;">Undo</button>
+      <button id="redoBtn" title="R" style="width: 100%; text-align: left;">Redo</button>
+      <button id="hintBtn" title="H" style="width: 100%; text-align: left;">Hint</button>
+      <button id="dealBtn" title="D" style="width: 100%; text-align: left; margin-bottom: 8px;">Deal</button>
+      
+      <select id="difficulty" style="width: 100%; margin-bottom: 8px; padding: 6px; font-size: 0.9em;">
         <option value="1-suit" selected>1-suit</option>
         <option value="2-suit">2-suit</option>
         <option value="4-suit">4-suit</option>
       </select>
-      <label class="aces-toggle">
+      
+      <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.9em;">
         <input type="checkbox" id="includeAces">
         <span>Include Aces</span>
       </label>
-      <input id="seedInput" class="seedbox" type="text" placeholder="custom seed"/>
-      <button id="setSeedBtn">Set Seed</button>
-      <button id="muteBtn">🔊</button>
-      <button id="verifyBtn" title="Check deck & invariants">Verify</button>
+      
+      <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+        <input id="seedInput" type="text" placeholder="custom seed" style="flex: 1; padding: 6px; font-size: 0.9em;"/>
+        <button id="setSeedBtn" style="padding: 0 8px;">Set</button>
+      </div>
+      
+      <div style="display: flex; gap: 4px;">
+        <button id="muteBtn" style="flex: 1; padding: 6px;">🔊</button>
+        <button id="verifyBtn" title="Check deck & invariants" style="flex: 1; padding: 6px;">Verify</button>
+      </div>
     </div>
+    <span id="dealReason" class="pill" style="display:none; margin-top: 6px; text-align: center; font-size: 0.9em;"></span>
   </div>
 
   <canvas id="game"></canvas>
@@ -434,7 +491,7 @@
       }
       
       function thud() {
-        generateSound(80, 0.2, 'sine', 0.3);
+        generateSound(100, 0.3, 'sine', 0.8);  // Increased gain from 0.3 to 0.5
       }
       
       function chord() { 
@@ -849,10 +906,14 @@
       canvas.height=window.innerHeight; 
       W=canvas.width; 
       H=canvas.height; 
-      const availW=W - margin*2 - gap*9; 
-      cardW=clamp(Math.floor(availW/10), 68, 116); 
-      cardH=Math.floor(cardW*1.4); 
-      topArea=Math.max(150, cardH+40); 
+      margin=0; 
+      cardW=125; 
+      cardH=cardW*1.4; 
+      overlapUp=cardH/4; 
+      overlapDown=cardH/4; 
+      topArea=120; 
+      // Position the first column at 10px from the left edge
+      colX=c=>10 + c*(cardW+8); 
       overlapUp=Math.floor(cardH*0.24); 
       overlapDown=Math.floor(cardH*0.30); 
       
@@ -896,8 +957,8 @@
     }, { passive: false });
     window.addEventListener('resize', resize);
 
-    const colX = (i)=> margin + i*(cardW+gap);
-    const pileY = ()=> margin + 20;
+    let colX = (i) => margin + i * (cardW + gap);
+    const pileY = () => margin + 20;
 
     function drawRounded(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 
@@ -923,9 +984,10 @@
     // }
 
     function drawCard(x,y,card){ 
-      const r=12; 
+      const r=15; 
       ctx.save(); 
       // Shadow removed from text
+      ctx.font = `bold ${Math.floor(cardW/5.5)}px Arial`;
       
       // Draw the card background
       drawRounded(x,y,cardW,cardH,r);
@@ -998,23 +1060,7 @@
       ctx.save();
       ctx.translate(0, -scrollY);
       
-      // stock
-      const sx=margin, sy=pileY(); 
-      drawRounded(sx,sy,cardW,cardH,12); 
-      ctx.fillStyle='rgba(255,255,255,.06)'; 
-      ctx.fill(); 
-      ctx.strokeStyle='rgba(255,255,255,.18)'; 
-      ctx.stroke(); 
-      ctx.save(); 
-      ctx.globalAlpha=.6; 
-      ctx.fillStyle='rgba(255,255,255,.2)'; 
-      for(let i=0;i<Math.min(state.dealsRemaining*10,50); i+=10){ 
-        ctx.fillRect(sx+6+i/50*8, sy+6, cardW-12, cardH-12);
-      } 
-      ctx.restore(); 
-      ctx.fillStyle='var(--muted)'; 
-      ctx.font='12px system-ui'; 
-      ctx.fillText('Stock', sx, sy-6);
+      // Stock visualization removed
       // Removed foundations display - now shown as a counter in the HUD
       // columns
       const y0=topArea; 
@@ -1049,6 +1095,19 @@
       }
       // drag ghost (not affected by scroll)
       ctx.restore(); // Restore transform for drag ghost
+      
+      // Draw column numbers (drawn after scroll restore to stay on top)
+      ctx.save();
+      ctx.font = 'bold 24px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for(let c = 0; c < 10; c++) {
+        const x = colX(c) + cardW/2;
+        const y = topArea - 15; // Moved down slightly (from -30 to -15)
+        ctx.fillText(c + 1, x, y);
+      }
+      ctx.restore();
       if(drag.active){ 
         let yy=drag.y - drag.grabOffsetY; 
         for(const card of drag.stack){ 
