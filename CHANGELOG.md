@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.4] - 2025-08-21
+### Added
+- Enhanced audio system with WebAudio API
+- New sound effects for card interactions (click on select, thud on drop)
+- Mute button with persistent state
+- Audio feedback for game actions
+- Visual feedback for audio state
+- spider-thumb-01.png for the sample play image
+- Added README.md for GitHub
+
+### Changed
+- Improved UI layout and fixed column numbers
+- Increased font sizes for better readability
+- Moved sets counter for better visual hierarchy
+- Resized toolbar for improved usability
+- Various UI/UX improvements and bug fixes
+
 ## [0.0.3] - 2025-08-21
 ### Added
 - Comprehensive game statistics tracking (moves, time, score, outcomes)
@@ -14,13 +31,7 @@
 - Best time, moves, and score tracking
 - Visual indicators for game outcomes in history
 - Stats button in the main game interface
-- Proper error handling for game state management- Enhanced audio system with WebAudio API
-- New sound effects for card interactions (click on select, thud on drop)
-- Mute button with persistent state
-- Audio feedback for game actions
-- Improved stats modal with better layout and information display
-- Game statistics persistence across sessions
-- Visual feedback for audio state
+- Proper error handling for game state management
 
 ## [0.0.2] - 2025-08-21
 ### Added
