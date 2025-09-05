@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.0.5] - 2025-09-04
+### Added
+- New comprehensive game history system with persistent storage
+- Deduplication of game history by seed and difficulty
+- Automatic cleanup of duplicate game entries
+- Improved statistics panel with detailed game history
+- Ability to resume in-progress games from history
+- Replay functionality for completed games
+- Enhanced timer system that persists across page refreshes
+- Visual indicators for in-progress and completed games
+- Detailed move tracking and state snapshots
+- Automatic save after every move
+
+### Changed
+- Replaced old stats system with new history-based implementation
+- Improved game state serialization for better reliability
+- Updated UI for history panel with better organization
+- Enhanced game loading/saving mechanism
+- Improved timer accuracy and persistence
+- Streamlined game initialization process
+
+### Removed
+- Legacy stats and persistence system
+- Redundant game state management code
+- Unused statistics tracking functions
+
 ## [0.0.4] - 2025-08-21
 ### Added
 - Enhanced audio system with WebAudio API

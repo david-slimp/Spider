@@ -3,10 +3,8 @@
  * This file intentionally avoids touching the DOM; it talks to the UI via small hooks.
  */
 
-import { trackGameStart, updateActiveGame, recordGameResult } from './stats.js';
-
 // ---- Utilities ----
-const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const clamp = (v,a,b)=>v<a?a:v>b?b:v;
 const now = ()=>performance.now();
 
 // ---- PRNG ----
@@ -34,9 +32,13 @@ export function setUIHooks(h) { Object.assign(hooks, h); }
 export const state = {
   difficulty:'1-suit', seed:'', rng:null, includeAces: false,
   tableau:[[],[],[],[],[],[],[],[],[],[]], stock:[], dealsRemaining:5, foundations:0,
-  moves:0, score:500, startTime:0, elapsedMs:0, running:true,
+  moves:0, score:500, startTime:0, elapsedMs:0, running:false,        // running=false until first move
   history:[], redo:[], message:'', hint:null, won:false, foundationsCards:[]
 };
+
+// expose convenience globals for other files / History serializer
+window.currentSeed = state.seed;
+window.currentDifficulty = state.difficulty;
 
 // Verification notes (consumed by verification modal)
 let verificationNotes = [];
@@ -47,9 +49,9 @@ function addVerificationNote(note) { verificationNotes.push(note); }
 export function createDeck(difficulty, includeAces = false) {
   resetVerificationNotes();
   let suits;
-  if (difficulty === '1-suit') suits = Array(8).fill('♠');
-  else if (difficulty === '2-suit') suits = [...Array(4).fill('♠'), ...Array(4).fill('♥')];
-  else suits = ['♠', '♥', '♦', '♣', '♠', '♥', '♦', '♣'];
+  if (difficulty === '1-suit') suits = Array(8).fill('#');
+  else if (difficulty === '2-suit') suits = [...Array(4).fill('#'), ...Array(4).fill('#')];
+  else suits = ['#', '#', '#', '#', '#', '#', '#', '#'];
 
   const deck = [];
   let id = 0;
@@ -162,24 +164,77 @@ export function completeTopRun(colIndex, includeAces = false){
   return true;
 }
 
-// ---- Game actions ----
-export function newGame({difficulty=state.difficulty, seed=randSeed(), includeAces=state.includeAces}={}){
-  const suitCount = difficulty === '1-suit' ? 1 : difficulty === '2-suit' ? 2 : 4;
-  trackGameStart({ suitCount, seed, difficulty });
+// ---- History wiring helpers ----
+function serializeGameState() {
+  return {
+    seed: state.seed,
+    difficulty: state.difficulty,
+    moves: state.moves|0,
+    score: state.score|0,
+    stock: state.stock.map(c => ({...c})),
+    tableaus: state.tableau.map(col => col.map(c => ({...c}))),
+    foundations: state.foundationsCards.map(c => ({...c})),
+    waste: [] // not used in this variant
+  };
+}
+function recordMoveForHistory() {
+  if (!window.GameHistory) return;
+  const payload = {
+    seed: state.seed,
+    difficulty: state.difficulty,
+    snapshot: serializeGameState(),
+    moves: state.moves || 0,
+    score: state.score || 0
+  };
+  if (!window.__firstMoveLogged__) {
+    window.__firstMoveLogged__ = true;
+    state.running = true;        // fallback timer only; History drives real timer
+    GameHistory.onFirstMove(payload);
+  } else {
+    GameHistory.onMove(payload);
+  }
+}
+function recordWinForHistory() {
+  if (!window.GameHistory) return;
+  GameHistory.onWin({
+    snapshot: serializeGameState(),
+    moves: state.moves || 0,
+    score: state.score || 0
+  });
+}
 
-  state.difficulty=difficulty; 
-  state.seed=seed; 
-  state.includeAces = includeAces;
-  state.rng=mulberry32(hashSeed(difficulty+':'+seed));
-  const deck=createDeck(difficulty, includeAces); 
+// ---- Game actions ----
+export function newGame({difficulty=state.difficulty, seed=randSeed(), includeAces=state.includeAces}={}) {
+  // normalize difficulty label
+  const diff = (difficulty === '1' || difficulty === '1-suit') ? '1-suit'
+             : (difficulty === '2' || difficulty === '2-suit') ? '2-suit'
+             : '4-suit';
+
+  state.difficulty = diff;
+  state.seed = String(seed);
+  state.includeAces = !!includeAces;
+  window.currentSeed = state.seed;
+  window.currentDifficulty = state.difficulty;
+
+  state.rng = mulberry32(hashSeed(state.difficulty+':'+state.seed));
+  const deck = createDeck(state.difficulty, state.includeAces);
   shuffle(deck, state.rng);
-  const deal=initialDeal(deck);
+  const deal = initialDeal(deck);
+
   state.tableau=deal.tableau; state.stock=deal.stock; state.dealsRemaining=5; state.foundations=0;
   state.moves=0; state.score=500; state.history=[]; state.redo=[]; state.message=''; state.hint=null; state.won=false;
-  state.startTime=now(); state.elapsedMs=0; state.running=true; hooks.updateUI(); hooks.draw();
+
+  // Timer DOES NOT start yet; we'll start counting after first move.
+  state.startTime = 0;
+  state.elapsedMs = 0;
+  state.running = false;
+  window.__firstMoveLogged__ = false;
+
+  hooks.updateUI(); hooks.draw();
+
   lastTick = now();
   tick();
-  saveGame();
+
 }
 
 export function dealRow(){ 
@@ -212,11 +267,10 @@ export function dealRow(){
   state.moves++;
   state.score=Math.max(0,state.score-1);
 
-  updateActiveGame({ moves: state.moves, score: state.score, lastMove: new Date().toISOString() });
+  recordMoveForHistory(); // NEW: history/timer tick source
   for(let c=0;c<10;c++) completeTopRun(c, state.includeAces);
   hooks.updateUI();
   hooks.draw();
-  saveGame();
   hooks.audio.shuffle();
   return true;
 }
@@ -251,13 +305,13 @@ export function doMove(from, startIndex, to){
   state.redo=[]; 
   state.moves++; 
   state.score=Math.max(0,state.score-1); 
-  updateActiveGame({ moves: state.moves, score: state.score, lastMove: new Date().toISOString() });
-  completeTopRun(to);
-  completeTopRun(from);
+
+  recordMoveForHistory(); // NEW
+  completeTopRun(to, state.includeAces);
+  completeTopRun(from, state.includeAces);
   checkWin(); 
   hooks.updateUI(); 
-  hooks.draw(); 
-  saveGame(); 
+  hooks.draw();
   return true; 
 }
 
@@ -297,10 +351,9 @@ export function undo(){
     state.redo.push(h);
   }
   state.moves++;
-  updateActiveGame({ moves: state.moves, score: state.score, foundations: state.foundations, lastMove: new Date().toISOString() });
+  recordMoveForHistory(); // NEW
   hooks.draw();
   hooks.updateUI();
-  saveGame();
 }
 
 export function redo(){ 
@@ -338,50 +391,35 @@ export function redo(){
     state.history.push(h);
   }
   state.moves++;
-  updateActiveGame({ moves: state.moves, score: state.score, foundations: state.foundations, lastMove: new Date().toISOString() });
+  recordMoveForHistory(); // NEW
   hooks.draw();
   hooks.updateUI();
-  saveGame();
 }
 
 export function checkWin(){ 
   if(state.foundations===8){ 
-    state.won=true; 
-    state.running=false; 
-    hooks.audio.chord(); 
-    recordGameResult('win');
-    hooks.showWin(); 
+    state.won=true;
+    state.running=false;
+    hooks.audio.chord();
+    recordWinForHistory(); // NEW
+    hooks.showWin();
   } 
 }
 
-// ---- Persistence ----
-const STORAGE_KEY='spider.v2.lastGame';
-export function saveGame(){
-  try{
-    const payload={
-      d:state.difficulty, s:state.seed, deals:state.dealsRemaining, f:state.foundations, m:state.moves, sc:state.score, t:state.elapsedMs,
-      tab:state.tableau.map(col=>col.map(c=>({id:c.id,s:c.suit,r:c.rank,u:c.faceUp}))),
-      stock:state.stock.map(c=>({id:c.id,s:c.suit,r:c.rank,u:c.faceUp})),
-      fd:state.foundationsCards.map(c=>({id:c.id,s:c.suit,r:c.rank,u:c.faceUp}))
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }catch{}
-}
-export function loadGame(){
-  try{
-    const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return false; const p=JSON.parse(raw);
-    state.difficulty=p.d; state.seed=p.s; state.rng=mulberry32(hashSeed(state.difficulty+':'+state.seed));
-    state.dealsRemaining=p.deals; state.foundations=p.f; state.moves=p.m; state.score=p.sc; state.elapsedMs=p.t; state.running=true; state.won=false; state.history=[]; state.redo=[];
-    state.tableau=p.tab.map(col=>col.map(o=>({id:o.id,suit:o.s,rank:o.r,faceUp:o.u})));
-    state.stock=p.stock.map(o=>({id:o.id,suit:o.s,rank:o.r,faceUp:o.u}));
-    state.foundationsCards=(p.fd||[]).map(o=>({id:o.id,suit:o.s,rank:o.r,faceUp:o.u}));
-    hooks.updateUI(); hooks.draw(); return true;
-  }catch{ return false; }
-}
 
 // ---- Scroll-independent timer ----
 let lastTick=now();
-function tick(){ if(state.running){ state.elapsedMs+=(now()-lastTick);} lastTick=now(); hooks.updateUI(); requestAnimationFrame(tick); }
+function tick(){
+  // If History exists, the timer derives from it (0 until first move)
+  if (window.GameHistory && typeof window.GameHistory.getElapsedSeconds === 'function') {
+    state.elapsedMs = GameHistory.getElapsedSeconds() * 1000;
+  } else {
+    if (state.running) { state.elapsedMs += (now()-lastTick); }
+  }
+  lastTick = now();
+  hooks.updateUI();   // <- drives HUD, including #time
+  requestAnimationFrame(tick);
+}
 export function startTick(){ lastTick = now(); requestAnimationFrame(tick); }
 
 // ---- Hints (pure logic) ----
@@ -442,3 +480,53 @@ export function verifyInventory() {
 // ---- Formatting helpers & boot helpers ----
 export function fmtTime(ms){ const s=Math.floor(ms/1000); const m=(s/60)|0; const ss=(s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
 export function initFromURL(){ const url=new URL(location.href); const seed=url.searchParams.get('seed')||randSeed(); const diff=url.searchParams.get('difficulty')||'1-suit'; return {seed,difficulty:diff}; }
+
+// ---- Resume/Replay for History panel ----
+function cloneCard(c){ return c ? ({id:c.id,suit:c.suit,rank:c.rank,faceUp:!!c.faceUp}) : c; }
+function clonePile(p){ return Array.isArray(p) ? p.map(cloneCard) : []; }
+function canonDiffLabel(d){ return (d==='1'||d==='1-suit')?'1-suit':(d==='2'||d==='2-suit')?'2-suit':'4-suit'; }
+
+window.Game = window.Game || {};
+
+window.Game.loadSnapshot = function (snap, meta) {
+  function cloneCard(c){ return c ? ({id:c.id,suit:c.suit,rank:c.rank,faceUp:!!c.faceUp}) : c; }
+  function clonePile(p){ return Array.isArray(p) ? p.map(cloneCard) : []; }
+  const canonDiffLabel = d => (d==='1'||d==='1-suit')?'1-suit':(d==='2'||d==='2-suit')?'2-suit':'4-suit';
+
+  state.difficulty = canonDiffLabel(meta?.difficulty ?? snap.difficulty ?? state.difficulty);
+  state.seed = String(meta?.seed ?? snap.seed ?? state.seed);
+  window.currentSeed = state.seed;
+  window.currentDifficulty = state.difficulty;
+
+  state.rng = mulberry32(hashSeed(state.difficulty+':'+state.seed));
+  state.moves = (snap.moves|0) || 0;
+  state.score = (snap.score|0) || 0;
+
+  state.tableau = Array.isArray(snap.tableaus) ? snap.tableaus.map(clonePile) : state.tableau;
+  state.stock = Array.isArray(snap.stock) ? snap.stock.map(cloneCard) : state.stock;
+  state.foundationsCards = Array.isArray(snap.foundations) ? snap.foundations.map(cloneCard) : [];
+  state.foundations = Math.floor(state.foundationsCards.length / 13);
+
+  state.dealsRemaining = Math.max(0, 5 - Math.floor((50 - state.stock.length) / 10));
+
+  // >>> key change: show prior elapsed immediately on resume <<<
+  if (meta && typeof meta.elapsedSeconds === 'number') {
+    state.elapsedMs = (meta.elapsedSeconds | 0) * 1000;
+  } else {
+    state.elapsedMs = 0; // fallback for non-resume loads
+  }
+
+  // If we resumed, __firstMoveLogged__ is true, so run clock immediately.
+  state.won = false;
+  state.history = [];
+  state.redo = [];
+  state.running = !!window.__firstMoveLogged__;
+
+  hooks.updateUI(); 
+  hooks.draw();
+};
+
+window.Game.replaySeedDiff = function (seed, difficulty) {
+  newGame({ seed: String(seed), difficulty: canonDiffLabel(difficulty), includeAces: state.includeAces });
+};
+

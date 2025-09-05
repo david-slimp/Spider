@@ -10,7 +10,7 @@
   <div id="hud">
     <div id="top-bar">
       <div style="display: flex; gap: 15px; align-items: center;">
-        <div>David's Spider - v0.0.4</div>
+        <div>David's Spider - v0.0.5</div>
         <div>Time: <span id="time">0:00</span></div>
         <div>Moves: <span id="moves">0</span></div>
         <div>Score: <span id="score">500</span></div>
@@ -107,7 +107,8 @@
   </div>
 
   <!-- Keep stats module available -->
-  <script type="module" src="./stats.js"></script>
   <script type="module" src="./renderUI.js"></script>
+  <script src="history.js"></script>
+  <script src="stats.adapter.js"></script>
 </body>
 </html>

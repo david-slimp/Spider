@@ -1,7 +1,7 @@
 // renderUI.js
 // All DOM, canvas drawing, input, modals, audio, and wiring. Talks to logic via hooks.
-import { state, setUIHooks, newGame, dealRow, doMove, undo, redo, verifyInventory, computeHint, fmtTime, initFromURL, loadGame, startTick } from './logic.js';
-import { recoverIncompleteGames, recordGameResult, getGameStats } from './stats.js';
+import { state, setUIHooks, newGame, dealRow, doMove, undo, redo, verifyInventory, computeHint, fmtTime, initFromURL, startTick } from './logic.js';
+// import { recoverIncompleteGames, recordGameResult, getGameStats } from './stats.js';
 
 const $ = (id)=>document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -381,6 +381,7 @@ function showVerificationModal({ ok, duplicates, missing, counts, expectedTotal,
   setTimeout(() => { if (document.body.contains(modal)) document.body.removeChild(modal); }, 10000);
 }
 
+
 // ---- Hints UI ----
 function showHint(){
   const hints = computeHint();
@@ -409,44 +410,43 @@ $('closeHint').onclick = () => { $('hintModal').style.display = 'none'; state.hi
 $('hintModal').onclick = (e) => { if (e.target === $('hintModal')) { $('hintModal').style.display = 'none'; state.hint = null; draw(); } };
 
 // ---- Stats UI ----
-function showStats() {
-  const statsModal = $('statsModal'); const overallStats = $('overallStats'); const recentGames = $('recentGames');
-  const stats = getGameStats();
-  const totalGames = stats.stats?.totalGames || 0;
-  const wins = stats.stats?.wins || 0;
-  const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-  overallStats.innerHTML = `
-    <div>Total Games: ${totalGames}</div>
-    <div>Wins: ${wins} (${winRate}%)</div>
-    <div>Current Streak: ${stats.stats?.currentStreak || 0}</div>
-    <div>Best Streak: ${stats.stats?.bestStreak || 0}</div>
-    <div>Best Time: ${stats.stats?.bestTime ? fmtTime(stats.stats.bestTime) : 'N/A'}</div>
-    <div>Best Moves: ${stats.stats?.bestMoves || 'N/A'}</div>
-    <div>Best Score: ${stats.stats?.bestScore || 0}</div>`;
-  recentGames.innerHTML = '';
-  const recent = Object.entries(stats.games || {}).sort(([,a], [,b]) => (b.endTime || 0) - (a.endTime || 0)).slice(0, 5);
-  if (recent.length === 0) { recentGames.innerHTML = '<div>No recent games</div>'; }
-  else {
-    recent.forEach(([key, game]) => {
-      if (!game) return;
-      const gameEl = document.createElement('div');
-      gameEl.className = 'recent-game';
-      gameEl.innerHTML = `<div>${game.endTime ? new Date(game.endTime).toLocaleString() : 'Unknown time'}</div>
-        <div>${game.difficulty || 'Unknown'} - ${game.outcome === 'win' ? '🏆' : '❌'}</div>
-        <div>${game.duration ? fmtTime(game.duration) : 'N/A'} - ${game.moves || 0} moves - Score: ${game.score || 0}</div>`;
-      recentGames.appendChild(gameEl);
-    });
-  }
-  statsModal.style.display = 'flex'; document.body.style.overflow = 'hidden';
-}
 function initStats() {
   const showStatsBtn = $('showStats'); const closeBtn = $('closeStats'); const statsModal = $('statsModal');
-  if (showStatsBtn) showStatsBtn.onclick = showStats;
+  if (showStatsBtn) showStatsBtn.onclick = showStatsV2;
   if (closeBtn && statsModal) {
     closeBtn.onclick = () => { statsModal.style.display = 'none'; document.body.style.overflow = 'auto'; };
     statsModal.onclick = (e) => { if (e.target === statsModal) { statsModal.style.display = 'none'; document.body.style.overflow = 'auto'; } };
   }
 }
+
+// NEW: History-backed Stats entry point (keeps your modal & layout intact)
+function showStatsV2() {
+  const statsModal = document.getElementById('statsModal');
+  if (!statsModal) return;
+
+  // Ensure we have a container inside the modal to host the History table
+  let panel = document.getElementById('statsPanel');
+  if (!panel) {
+    const modalContent = statsModal.querySelector('.modal-content') || statsModal;
+    panel = document.createElement('div');
+    panel.id = 'statsPanel';
+    const btnRow = modalContent.querySelector('.modal-buttons');
+    if (btnRow) modalContent.insertBefore(panel, btnRow);
+    else modalContent.appendChild(panel);
+  } else {
+    panel.innerHTML = ''; // clear any previous render
+  }
+
+  // Render the new History view
+  if (window.GameHistory && typeof window.GameHistory.renderPanel === 'function') {
+    window.GameHistory.renderPanel('statsPanel');
+  } else {
+    panel.innerHTML = '<p style="color:#f88">History system not loaded. Make sure <code>history.js</code> is included.</p>';
+  }
+
+  statsModal.style.display = 'block';
+}
+
 
 // ---- Controls wiring ----
 $('newBtn').onclick=()=> newGame({ difficulty: state.difficulty, includeAces: $('includeAces').checked });
@@ -483,13 +483,13 @@ setUIHooks({ updateUI, draw, flashMsg, showWin, showVerificationModal, audio: Au
 // ---- Boot ----
 window.addEventListener('load', async () => {
   try {
-    const incompleteGame = await recoverIncompleteGames();
-    if (incompleteGame) recordGameResult('abandoned');
+    // const incompleteGame = await recoverIncompleteGames();
+    // if (incompleteGame) recordGameResult('abandoned');
   } catch {}
 });
 resize();
 const init = initFromURL();
-if(!loadGame()) { newGame(init); }
+if (window.__hudClockInterval) { clearInterval(window.__hudClockInterval); delete window.__hudClockInterval; }
 initStats();
 startTick();
 requestAnimationFrame(draw);
