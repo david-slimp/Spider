@@ -1,7 +1,6 @@
 // renderUI.js
 // All DOM, canvas drawing, input, modals, audio, and wiring. Talks to logic via hooks.
 import { state, setUIHooks, newGame, dealRow, doMove, undo, redo, verifyInventory, computeHint, fmtTime, initFromURL, startTick } from './logic.js';
-// import { recoverIncompleteGames, recordGameResult, getGameStats } from './stats.js';
 
 const $ = (id)=>document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -64,14 +63,31 @@ const ctx = canvas.getContext('2d');
 let W = 0, H = 0, cardW = 96, cardH = 134, margin = 0, topArea = 140, overlapUp = 26, overlapDown = 32;
 const RED = new Set(['♥','♦']);
 
+// --- HiDPI-aware canvas sizing helpers (keep drawing coords in CSS px) ---
+function dpr() { return window.devicePixelRatio || 1; }
+function setCanvasSize(cssW, cssH) {
+  const scale = dpr();
+  if (canvas.style.width  !== `${cssW}px`) canvas.style.width  = `${cssW}px`;
+  if (canvas.style.height !== `${cssH}px`) canvas.style.height = `${cssH}px`;
+  const pxW = Math.floor(cssW * scale);
+  const pxH = Math.floor(cssH * scale);
+  if (canvas.width !== pxW || canvas.height !== pxH) {
+    canvas.width = pxW;
+    canvas.height = pxH;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0); // keep math in CSS px
+  }
+  W = cssW; H = cssH;
+}
+function ensureCanvasHeight(cssH) {
+  if (cssH !== H) setCanvasSize(W, cssH);
+}
+
 // ---- Layout ----
 function resize() { 
+  // Base size in CSS px; we’ll grow taller during draw() when needed
   W = window.innerWidth;
   H = window.innerHeight;
-  
-  // Set canvas to full viewport width
-  canvas.width = W;
-  canvas.height = H;
+  setCanvasSize(W, H);
   
   // Calculate card dimensions based on viewport width
   const availableWidth = W - 186 - 20; // Account for sidebar and padding
@@ -82,7 +98,7 @@ function resize() {
   margin = 0;
   overlapUp = Math.max(20, Math.floor(cardH * 0.24));
   overlapDown = Math.max(24, Math.floor(cardH * 0.30));
-  topArea = 90; // Increased to create space for column numbers
+  topArea = 90; // space for column numbers
   
   // Position columns with equal spacing
   const totalGap = W - 186 - (10 * cardW) - 20; // Total gap space available
@@ -91,6 +107,7 @@ function resize() {
   
   draw();
 }
+window.addEventListener('resize', resize);
 
 // ---- Drawing ----
 function drawRounded(x,y,w,h,r) { 
@@ -137,11 +154,7 @@ function burst(){ for(let i=0;i<180;i++){ confetti.push({ x: W/2, y: topArea+car
 
 export function draw() {
   if (!ctx) return;
-  
-  // Clear the canvas
-  ctx.clearRect(0, 0, W, H);
-  
-  // Draw the game board
+
   const y0 = topArea;
   
   // Calculate total height needed for all columns
@@ -155,11 +168,17 @@ export function draw() {
     maxHeight = Math.max(maxHeight, colHeight);
   }
   
-  // Update canvas height if needed
-  const neededHeight = y0 + maxHeight + 100; // Add some padding at bottom
-  if (canvas.height < neededHeight) {
-    canvas.height = neededHeight;
+  // Ensure canvas is tall enough for this frame (CSS px). Only grow.
+  const neededHeight = Math.max(y0 + maxHeight + 100, window.innerHeight);
+  if (neededHeight > H) {
+    ensureCanvasHeight(neededHeight);
   }
+
+  // Clear the entire pixel buffer each frame, regardless of current transform
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
   
   // Draw columns
   for (let c = 0; c < 10; c++) {
@@ -200,19 +219,18 @@ export function draw() {
     }
   }
   
-  // Draw column numbers (drawn after scroll restore to stay on top)
+  // Draw column numbers
   ctx.save();
   ctx.font = 'bold 24px Arial';
-  ctx.fillStyle = '#FFFFFF'; // Bright white
+  ctx.fillStyle = '#FFFFFF';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let c = 0; c < 10; c++) {
     const x = colX(c) + cardW / 2;
-    const y = 60; // Positioned 20 pixels lower to match the new spacing
+    const y = 60;
     ctx.fillText(c + 1, x, y);
   }
   ctx.restore();
-  
   
   // Draw dragged cards
   if (drag.active) {
@@ -240,14 +258,11 @@ export function draw() {
       ctx.fillRect(-4, -4, 8, 8);
       ctx.restore();
     }
-    
     // Remove dead confetti
     confetti = confetti.filter(p => p.life > 0);
-    
-    // Request next animation frame if there's still confetti
-    if (confetti.length > 0) {
-      requestAnimationFrame(draw);
-    }
+
+    // Request next frame if there's more confetti
+    if (confetti.length > 0) requestAnimationFrame(draw);
   }
 }
 
@@ -255,7 +270,7 @@ export function draw() {
 const drag={active:false, fromCol:-1, startIndex:-1, stack:[], x:0,y:0, grabOffsetX:0, grabOffsetY:0};
 function colAt(px){ for(let c=0;c<10;c++){ const x=colX(c); if(px>=x && px<=x+cardW) return c; } return -1; }
 function rowAtInCol(py, col) { 
-  const y0 = topArea; // Start from top area
+  const y0 = topArea;
   const colArr = state.tableau[col]; 
   let yy = y0; 
   for (let i = 0; i < colArr.length; i++) { 
@@ -381,7 +396,6 @@ function showVerificationModal({ ok, duplicates, missing, counts, expectedTotal,
   setTimeout(() => { if (document.body.contains(modal)) document.body.removeChild(modal); }, 10000);
 }
 
-
 // ---- Hints UI ----
 function showHint(){
   const hints = computeHint();
@@ -447,7 +461,6 @@ function showStatsV2() {
   statsModal.style.display = 'block';
 }
 
-
 // ---- Controls wiring ----
 $('newBtn').onclick=()=> newGame({ difficulty: state.difficulty, includeAces: $('includeAces').checked });
 $('replayBtn').onclick=()=> newGame({ difficulty: state.difficulty, seed: state.seed, includeAces: state.includeAces });
@@ -463,11 +476,11 @@ $('muteBtn').onclick = () => { const v = !AudioKit.isMuted(); AudioKit.setMuted(
 $('verifyBtn').onclick=()=> { const data = verifyInventory(); showVerificationModal(data); };
 window.addEventListener('keydown', (e)=>{
   if(e.repeat) return;
-  
+
   // Don't process game commands if typing in the seed input
   const seedInput = document.activeElement.id === 'seedInput';
   if (seedInput) return;
-  
+
   const key = e.key.toLowerCase();
   if(key === 'n') $('newBtn').click();
   else if(key === 'd') $('dealBtn').click();
@@ -493,3 +506,4 @@ if (window.__hudClockInterval) { clearInterval(window.__hudClockInterval); delet
 initStats();
 startTick();
 requestAnimationFrame(draw);
+

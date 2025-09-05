@@ -7,6 +7,9 @@
 const clamp = (v,a,b)=>v<a?a:v>b?b:v;
 const now = ()=>performance.now();
 
+// --- Suits ---
+const SUIT = { SPADE:'♠', DIAMOND:'♦', HEART:'♥', CLUB:'♣' };
+
 // ---- PRNG ----
 function mulberry32(a){ return function(){ let t=a+=0x6D2B79F5; t=Math.imul(t ^ t>>>15, t|1); t^=t+Math.imul(t ^ t>>>7, t|61); return ((t ^ t>>>14)>>>0)/4294967296; } }
 function hashSeed(str){ let h=2166136261>>>0; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
@@ -49,10 +52,15 @@ function addVerificationNote(note) { verificationNotes.push(note); }
 export function createDeck(difficulty, includeAces = false) {
   resetVerificationNotes();
   let suits;
-  if (difficulty === '1-suit') suits = Array(8).fill('#');
-  else if (difficulty === '2-suit') suits = [...Array(4).fill('#'), ...Array(4).fill('#')];
-  else suits = ['#', '#', '#', '#', '#', '#', '#', '#'];
-
+  if (difficulty === '1-suit') {
+    suits = Array(8).fill(SUIT.SPADE);
+  } else if (difficulty === '2-suit') {
+    suits = [...Array(4).fill(SUIT.SPADE), ...Array(4).fill(SUIT.DIAMOND)];
+  } else {
+    suits = [SUIT.SPADE, SUIT.DIAMOND, SUIT.HEART, SUIT.CLUB,
+             SUIT.SPADE, SUIT.DIAMOND, SUIT.HEART, SUIT.CLUB];
+  }
+  
   const deck = [];
   let id = 0;
   for (const s of suits) {

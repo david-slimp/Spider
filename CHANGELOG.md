@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.6] - 2025-09-05
+### Added
+- New `SUIT` constant for consistent card suit representation
+- Proper Unicode suit symbols (♠, ♦, ♥, ♣) for better visual representation
+- Improved suit distribution in deck creation
+
+### Changed
+- Updated deck creation to use the new `SUIT` constants
+- Enhanced code readability with named suit constants
+- Improved type safety in suit handling
+
+## [0.0.5] - 2025-09-04
+
 ## [0.0.5] - 2025-09-04
 ### Added
 - New comprehensive game history system with persistent storage
