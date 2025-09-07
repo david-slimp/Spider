@@ -12,8 +12,6 @@
 - Improved type safety in suit handling
 
 ## [0.0.5] - 2025-09-04
-
-## [0.0.5] - 2025-09-04
 ### Added
 - New comprehensive game history system with persistent storage
 - Deduplication of game history by seed and difficulty

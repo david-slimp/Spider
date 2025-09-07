@@ -1,6 +1,7 @@
 // renderUI.js
 // All DOM, canvas drawing, input, modals, audio, and wiring. Talks to logic via hooks.
-import { state, setUIHooks, newGame, dealRow, doMove, undo, redo, verifyInventory, computeHint, fmtTime, initFromURL, startTick } from './logic.js';
+import { state, setUIHooks, newGame, dealRow, doMove, undo, redo, computeHint, fmtTime, initFromURL, startTick } from './logic.js';
+import { verifyInventory } from './validation.js';
 
 const $ = (id)=>document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;

@@ -48,6 +48,12 @@ let verificationNotes = [];
 function resetVerificationNotes() { verificationNotes = []; }
 function addVerificationNote(note) { verificationNotes.push(note); }
 
+// Accessor so validation.js can show deck/deal notes in the Verify modal
+export function getVerificationNotes() {
+  return Array.isArray(verificationNotes) ? [...verificationNotes] : [];
+}
+
+
 // ---- Deck & Dealing ----
 export function createDeck(difficulty, includeAces = false) {
   resetVerificationNotes();
@@ -229,8 +235,19 @@ export function newGame({difficulty=state.difficulty, seed=randSeed(), includeAc
   shuffle(deck, state.rng);
   const deal = initialDeal(deck);
 
-  state.tableau=deal.tableau; state.stock=deal.stock; state.dealsRemaining=5; state.foundations=0;
-  state.moves=0; state.score=500; state.history=[]; state.redo=[]; state.message=''; state.hint=null; state.won=false;
+  state.tableau = deal.tableau;
+  state.stock = deal.stock;
+  state.dealsRemaining = 5;
+  state.foundations = 0;
+  state.foundationsCards = []; // IMPORTANT: clear any previous game's foundation cards
+  state.moves = 0;
+  state.score = 500;
+  state.history = [];
+  state.redo = [];
+  state.message = '';
+  state.hint = null;
+  state.won = false;
+
 
   // Timer DOES NOT start yet; we'll start counting after first move.
   state.startTime = 0;
@@ -462,28 +479,6 @@ export function computeHint(){
   return hints.sort((a, b) => b.score - a.score || a.cardCount - b.cardCount);
 }
 
-// ---- Verification (returns data; UI decides how to display) ----
-export function verifyInventory() {
-  const loc = new Array(104).fill(null);
-  const duplicates = [];
-  const rankCounts = {};
-  const suitCounts = {};
-  const counts = { total: 0, tableau: 0, stock: 0, foundations: 0 };
-  const place = (card, where) => { 
-    if (loc[card.id] !== null) duplicates.push(card.id); 
-    loc[card.id] = where; 
-    counts.total++; 
-    rankCounts[card.rank] = (rankCounts[card.rank] || 0) + 1; 
-    suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1; 
-  };
-  for (const col of state.tableau) { for (const c of col) { place(c, 'T'); counts.tableau++; } }
-  for (const c of state.stock) { place(c, 'S'); counts.stock++; }
-  for (const c of state.foundationsCards) { place(c, 'F'); counts.foundations++; }
-  const missing = []; for (let i = 0; i < loc.length; i++) { if (loc[i] === null) missing.push(i); }
-  const expectedTotal = state.includeAces ? 104 : 96;
-  const ok = duplicates.length === 0 && missing.length === 0 && counts.total === expectedTotal && counts.tableau + counts.stock + counts.foundations === expectedTotal;
-  return { ok, duplicates, missing, counts, expectedTotal, includeAces: state.includeAces, notes: verificationNotes };
-}
 
 // ---- Formatting helpers & boot helpers ----
 export function fmtTime(ms){ const s=Math.floor(ms/1000); const m=(s/60)|0; const ss=(s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
