@@ -5,11 +5,17 @@
 - New `SUIT` constant for consistent card suit representation
 - Proper Unicode suit symbols (♠, ♦, ♥, ♣) for better visual representation
 - Improved suit distribution in deck creation
+- LAYOUT constants for consistent column spacing and positioning
+- Dynamic column width calculation based on viewport size
+- Improved responsive layout handling
 
 ### Changed
 - Updated deck creation to use the new `SUIT` constants
 - Enhanced code readability with named suit constants
 - Improved type safety in suit handling
+- Refactored column positioning logic for better maintainability
+- Updated card width calculation to use dynamic spacing
+- Enhanced window resize handling for smoother layout adjustments
 
 ## [0.0.5] - 2025-09-04
 ### Added

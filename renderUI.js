@@ -59,6 +59,14 @@ const AudioKit = (()=>{
 })();
 
 // ---- Canvas + layout ----
+const LAYOUT = {
+  SIDEBAR_WIDTH: 186,
+  HORIZONTAL_PADDING: 20,
+  COLUMN_MIN_GAP: 8,
+  COLUMN_LEFT_PADDING: 10,
+  COLUMN_COUNT: 10
+};
+
 const canvas = $('game');
 const ctx = canvas.getContext('2d');
 let W = 0, H = 0, cardW = 96, cardH = 134, margin = 0, topArea = 140, overlapUp = 26, overlapDown = 32;
@@ -85,14 +93,14 @@ function ensureCanvasHeight(cssH) {
 
 // ---- Layout ----
 function resize() { 
-  // Base size in CSS px; we’ll grow taller during draw() when needed
+  // Base size in CSS px; we'll grow taller during draw() when needed
   W = window.innerWidth;
   H = window.innerHeight;
   setCanvasSize(W, H);
   
   // Calculate card dimensions based on viewport width
-  const availableWidth = W - 186 - 20; // Account for sidebar and padding
-  cardW = Math.min(125, Math.floor(availableWidth / 10) - 8); // 10 cards with 8px gap
+  const availableWidth = W - LAYOUT.SIDEBAR_WIDTH - LAYOUT.HORIZONTAL_PADDING;
+  cardW = Math.min(125, Math.floor(availableWidth / LAYOUT.COLUMN_COUNT) - LAYOUT.COLUMN_MIN_GAP);
   cardH = Math.floor(cardW * 1.4);
   
   // Update layout metrics
@@ -101,10 +109,12 @@ function resize() {
   overlapDown = Math.max(24, Math.floor(cardH * 0.30));
   topArea = 90; // space for column numbers
   
-  // Position columns with equal spacing
-  const totalGap = W - 186 - (10 * cardW) - 20; // Total gap space available
-  const gapSize = Math.max(8, Math.floor(totalGap / 9)); // At least 8px between cards
-  window.colX = c => 10 + c * (cardW + gapSize);
+  // Calculate column layout with equal spacing
+  const totalGap = availableWidth - (LAYOUT.COLUMN_COUNT * cardW);
+  const gapSize = Math.max(LAYOUT.COLUMN_MIN_GAP, Math.floor(totalGap / (LAYOUT.COLUMN_COUNT - 1)));
+  
+  // Update the column position function
+  window.colX = c => LAYOUT.COLUMN_LEFT_PADDING + c * (cardW + gapSize);
   
   draw();
 }

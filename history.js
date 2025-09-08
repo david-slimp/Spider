@@ -261,7 +261,7 @@ function dedupeSeedDiff(preferId = null) {
       const summary =
 `<div class="stats-summary">
   <div>Total games: <strong>${games.length}</strong></div>
-  <div>Wins: <strong>${wins.length}</strong></div>
+  <div>Wins: <strong>${wins.length}</strong> (${games.length > 0 ? (wins.length / games.length * 100).toFixed(1) : '0.0'}%)</div>
   <div>Best Time: <strong>${bestTime ? fmtSec(bestTime.elapsedSeconds) : '-'}</strong></div>
   <div>Best Moves: <strong>${bestMoves ? bestMoves.moves : '-'}</strong></div>
   <div>Best Score: <strong>${bestScore ? bestScore.score : '-'}</strong></div>

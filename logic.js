@@ -1,7 +1,10 @@
-/* logic.js
+/*
+ * logic.js
  * Game state, rules, persistence, RNG, moves, verification, scoring, and hint computation.
  * This file intentionally avoids touching the DOM; it talks to the UI via small hooks.
+ * Core game logic for Spider Solitaire
  */
+/* global GameHistory */
 
 // ---- Utilities ----
 const clamp = (v,a,b)=>v<a?a:v>b?b:v;
