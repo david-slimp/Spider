@@ -16,6 +16,7 @@
 - Refactored column positioning logic for better maintainability
 - Updated card width calculation to use dynamic spacing
 - Enhanced window resize handling for smoother layout adjustments
+- Removed unused `#status` bar that was blocking mouse clicks at the bottom of the screen
 
 ## [0.0.5] - 2025-09-04
 ### Added
