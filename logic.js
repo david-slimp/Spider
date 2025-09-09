@@ -23,7 +23,12 @@ const randSeed = ()=>{ const a=new Uint32Array(2); crypto.getRandomValues(a); re
 export const hooks = {
   updateUI: () => {},
   draw: () => {},
-  flashMsg: (_m) => {},
+  flashMsg: (message, isError = true) => {
+    // This will be set by setUIHooks in renderUI.js
+    if (typeof window.flashMsg === 'function') {
+      window.flashMsg(message, isError);
+    }
+  },
   showWin: () => {},
   showVerificationModal: (_data) => {},
   audio: {
@@ -36,7 +41,7 @@ export function setUIHooks(h) { Object.assign(hooks, h); }
 
 // ---- Engine State ----
 export const state = {
-  difficulty:'1-suit', seed:'', rng:null, includeAces: false,
+  difficulty:'2-suit', seed:'', rng:null, includeAces: false,
   tableau:[[],[],[],[],[],[],[],[],[],[]], stock:[], dealsRemaining:5, foundations:0,
   moves:0, score:500, startTime:0, elapsedMs:0, running:false,        // running=false until first move
   history:[], redo:[], message:'', hint:null, won:false, foundationsCards:[]
@@ -177,7 +182,8 @@ export function completeTopRun(colIndex, includeAces = false){
   state.foundations++;
   state.history.push({t:'complete', col:colIndex, cards:rem, turned});
   state.score += 100;
-  hooks.audio.fanfare();
+  // Foundation complete sound
+  if (hooks.audio && typeof hooks.audio.chord === 'function') hooks.audio.chord();
   return true;
 }
 
@@ -259,6 +265,8 @@ export function newGame({difficulty=state.difficulty, seed=randSeed(), includeAc
   window.__firstMoveLogged__ = false;
 
   hooks.updateUI(); hooks.draw();
+  // Play shuffle sound when a new game starts
+  if (hooks.audio && typeof hooks.audio.shuffle === 'function') hooks.audio.shuffle();
 
   lastTick = now();
   tick();
@@ -299,7 +307,7 @@ export function dealRow(){
   for(let c=0;c<10;c++) completeTopRun(c, state.includeAces);
   hooks.updateUI();
   hooks.draw();
-  hooks.audio.shuffle();
+  if (hooks.audio && typeof hooks.audio.deal === 'function') hooks.audio.deal();
   return true;
 }
 
@@ -311,14 +319,14 @@ export function doMove(from, startIndex, to){
   for(let i=n-1;i>startIndex;i--){ 
     const a=src[i], b=src[i-1]; 
     if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ 
-      hooks.audio.blip(200,0.05,'square',0.04); 
+      hooks.audio.blip(); 
       hooks.flashMsg('Select a same-suit descending tail'); 
       return false; 
     } 
   }
   const moved=src.slice(startIndex); 
   if(!canDrop(moved[0], top(dst))){ 
-    hooks.audio.blip(200,0.05,'square',0.04);
+    hooks.audio.blip();
     hooks.flashMsg('Illegal move'); 
     return false; 
   }
@@ -428,7 +436,8 @@ export function checkWin(){
   if(state.foundations===8){ 
     state.won=true;
     state.running=false;
-    hooks.audio.chord();
+    // Game won fanfare
+    if (hooks.audio && typeof hooks.audio.fanfare === 'function') hooks.audio.fanfare();
     recordWinForHistory(); // NEW
     hooks.showWin();
   } 

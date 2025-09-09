@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.0.7] - 2025-09-08
+### Added
+- New toast notification system for displaying messages to the user
+- Visual feedback for user actions with animated toast messages
+- Error and success states for toast notifications
+- Click-to-dismiss functionality for toast messages
+- Responsive design for toast notifications on all screen sizes
+- Migrated audio system to Howler.js for robust, cross-browser playback
+- Replaced all SFX with new .ogg assets in `audio/` (click, thud, deal, foundation, win, shuffle)
+- Added shuffle sound when starting a new game and deal sound when dealing a row
+- All sounds now play at 60% volume and fade out during the last 0.25 seconds
+- Mute button persists across sessions and controls all sounds globally
+- Comprehensive JSDoc documentation for audio system and core game logic
+- Type definitions and parameter documentation for better code maintainability
+
+### Fixed
+- Fixed "cannot call start more than once" error in audio playback
+
+### Changed
+- Reduced default volume from 60% to 30% for better user experience
+- Updated default game difficulty from 1-suit to 2-suit for a more balanced starting experience
+- Improved difficulty handling in verification system to properly support all game modes
+- Fixed verification panel to correctly validate 2-suit game mode
+
+
 ## [0.0.6] - 2025-09-05
 ### Added
 - New `SUIT` constant for consistent card suit representation

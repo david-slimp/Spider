@@ -2,61 +2,13 @@
 // All DOM, canvas drawing, input, modals, audio, and wiring. Talks to logic via hooks.
 import { state, setUIHooks, newGame, dealRow, doMove, undo, redo, computeHint, fmtTime, initFromURL, startTick } from './logic.js';
 import { verifyInventory } from './validation.js';
+import { showToast } from './toast.js';
+import { AudioKit } from './audio.js';
 
 const $ = (id)=>document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
-// ---- Audio (same behavior as original) ----
-const AudioKit = (()=>{ 
-  const ctx = new (window.AudioContext||window.webkitAudioContext)(); 
-  let muted = localStorage.getItem('audioMuted') === 'true' || false;
-  const playFanfare = () => {
-    if (muted) return;
-    const now = ctx.currentTime;
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc1.type = 'sine'; osc2.type = 'sine';
-    osc1.frequency.setValueAtTime(440, now);
-    osc2.frequency.setValueAtTime(554.365, now);
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.15, now + 0.1);
-    gain.gain.linearRampToValueAtTime(0, now + 1.2);
-    osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
-    osc1.start(now); osc2.start(now); osc1.stop(now + 1.2); osc2.stop(now + 1.2);
-  };
-  const playShuffle = () => {
-    if (muted) return;
-    const now = ctx.currentTime;
-    const bufferSize = ctx.sampleRate * 0.5;
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-    const bandpass = ctx.createBiquadFilter(); bandpass.type='bandpass'; bandpass.frequency.value=800; bandpass.Q.value=1.0;
-    const lowpass = ctx.createBiquadFilter(); lowpass.type='lowpass'; lowpass.frequency.value=2000;
-    const gainNode = ctx.createGain(); gainNode.gain.setValueAtTime(0.5, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-    const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
-    noise.connect(bandpass); bandpass.connect(lowpass); lowpass.connect(gainNode); gainNode.connect(ctx.destination);
-    for (let i = 0; i < 3; i++) { const t = now + (i * 0.12); noise.start(t); noise.stop(t + 0.5); }
-  };
-  function generateSound(freq=880, len=0.06, type='triangle', gain=0.05, click=false) { 
-    if (muted) return null;
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type = type; o.frequency.value = freq; o.connect(g);
-    if (click) { g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(gain, ctx.currentTime + 0.001); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + len); }
-    else { g.gain.value = gain; g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + len); }
-    g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + len); return o;
-  };
-  function blip(freq=880, len=0.06, type='triangle', g=0.05) { generateSound(freq, len, type, g); }
-  function click() { generateSound(1000, 0.04, 'sine', 0.2, true); }
-  function thud() { generateSound(100, 0.3, 'sine', 0.8); }
-  function chord() { [523, 659, 784, 988].forEach((f, i) => setTimeout(() => generateSound(f, 0.16, 'sine', 0.06), i * 70)); }
-  function setMuted(v) {
-    muted = v; localStorage.setItem('audioMuted', v);
-    const muteBtn = document.getElementById('muteBtn'); if (muteBtn) muteBtn.textContent = v ? '🔇' : '🔊';
-  }
-  return { blip, click, thud, chord, setMuted, isMuted: () => muted, resume() { if (ctx.state === 'suspended') { ctx.resume(); } }, fanfare: playFanfare, shuffle: playShuffle };
-})();
+// Audio is now provided by Howler via audio.js
 
 // ---- Canvas + layout ----
 const LAYOUT = {
@@ -306,7 +258,7 @@ function onPointerDown(e){
   const card=column[row]; 
   if(!card.faceUp){ bounce(); return; }
   AudioKit.click();
-  for(let i=column.length-1;i>row;i--){ const a=column[i], b=column[i-1]; if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ bounce(); flashMsg('Drag a same-suit descending tail'); return; } }
+  for(let i=column.length-1;i>row;i--){ const a=column[i], b=column[i-1]; if(!(a.faceUp && b.faceUp && a.rank+1===b.rank && a.suit===b.suit)){ bounce(); flashMsg('Drag a same-suit descending tail', true); return; } }
   drag.active = true; 
   drag.fromCol = col; 
   drag.startIndex = row; 
@@ -331,7 +283,7 @@ function onPointerUp(e){
 }
 canvas.addEventListener('pointerdown', onPointerDown);
 
-function bounce(){ canvas.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:120}); AudioKit.blip(200,0.05,'square',0.04); }
+function bounce(){ canvas.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:120}); AudioKit.blip(); }
 
 // ---- UI glue ----
 function updateUI(){
@@ -363,7 +315,10 @@ function updateUI(){
   const diffSel = $('difficulty'); if(diffSel) diffSel.value = state.difficulty;
   document.title = state.won? '✅ Spider – Win!' : 'Spider Solitaire – Peacock';
 }
-function flashMsg(m){ state.message=m; const el=$('msg'); el.textContent=m; el.style.opacity=1; el.animate([{opacity:1},{opacity:0}],{duration:1600, fill:'forwards'}); }
+
+function flashMsg(message, isError = false) {
+  showToast(message, isError);
+}
 
 function showWin() { 
   $('winTime').textContent = fmtTime(state.elapsedMs); 
@@ -375,7 +330,7 @@ function showWin() {
   burst(); 
 }
 $('playAgain').onclick=()=>{ $('winModal').style.display='none'; newGame({ difficulty: state.difficulty, includeAces: state.includeAces }); };
-$('shareSeed').onclick=async()=>{ const url=new URL(location.href); url.searchParams.set('seed', state.seed); url.searchParams.set('difficulty', state.difficulty); try{ await navigator.clipboard.writeText(url.toString()); flashMsg('Link copied'); }catch{ flashMsg(url.toString()); } };
+$('shareSeed').onclick=async()=>{ const url=new URL(location.href); url.searchParams.set('seed', state.seed); url.searchParams.set('difficulty', state.difficulty); try{ await navigator.clipboard.writeText(url.toString()); flashMsg('Link copied', false); }catch{ flashMsg('Failed to copy to clipboard. Here is the URL to share: ' + url.toString(), true); } };
 
 function showVerificationModal({ ok, duplicates, missing, counts, expectedTotal, includeAces, notes }) {
   const modal = document.createElement('div');
@@ -476,7 +431,7 @@ function showStatsV2() {
 $('newBtn').onclick=()=> newGame({ difficulty: state.difficulty, includeAces: $('includeAces').checked });
 $('replayBtn').onclick=()=> newGame({ difficulty: state.difficulty, seed: state.seed, includeAces: state.includeAces });
 $('dealBtn').onclick=()=> dealRow();
-$('undoBtn').onclick=()=> undo();
+$('undoBtn').onclick=()=> { AudioKit.undo(); undo(); };
 $('redoBtn').onclick=()=> redo();
 $('hintBtn').onclick=()=> showHint();
 $('difficulty').onchange=(e)=> newGame({ difficulty: e.target.value, includeAces: $('includeAces').checked });
@@ -502,6 +457,8 @@ window.addEventListener('keydown', (e)=>{
 });
 
 // ---- Hook up logic->UI bridge ----
+// Make flashMsg available globally for logic.js
+window.flashMsg = flashMsg;
 setUIHooks({ updateUI, draw, flashMsg, showWin, showVerificationModal, audio: AudioKit });
 
 // ---- Boot ----

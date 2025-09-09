@@ -5,12 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Spider</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Howler.js for audio -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js" integrity="sha512-xi/RZRIF/S0hJ+yJJYuZ5yk6/8pCiRlEXZzoguSMl+vk2i3m6UjUO/WcZ11blRL/O+rnj94JRGwt/CHbc9+6EA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
   <div id="hud">
     <div id="top-bar">
       <div style="display: flex; gap: 15px; align-items: center;">
-        <div>David's Spider - v0.0.6</div>
+        <div>David's Spider - v0.0.7</div>
         <div>Time: <span id="time">0:00</span></div>
         <div>Moves: <span id="moves">0</span></div>
         <div>Score: <span id="score">500</span></div>
@@ -32,8 +34,8 @@
       <button id="dealBtn" title="D" style="width: 100%; text-align: left; margin-bottom: 8px;">Deal</button>
 
       <select id="difficulty" style="width: 100%; margin-bottom: 8px; padding: 6px; font-size: 0.9em;">
-        <option value="1-suit" selected>1-suit</option>
-        <option value="2-suit">2-suit</option>
+        <option value="1-suit">1-suit</option>
+        <option value="2-suit" selected>2-suit</option>
         <option value="4-suit">4-suit</option>
       </select>
 
