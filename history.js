@@ -229,6 +229,14 @@ function dedupeSeedDiff(preferId = null) {
       // The replay creates its *new* record on the next first move.
     },
 
+    // Clear all game history
+    clearAll() {
+      if (confirm('Are you sure you want to clear all game history? This cannot be undone.')) {
+        localStorage.removeItem(STORAGE_KEY);
+        this.renderPanel();
+      }
+    },
+
     // Render the History/Stats table
     renderPanel(containerId = 'statsPanel') {
       // Find (or create) a panel element to host the table
@@ -323,6 +331,25 @@ function dedupeSeedDiff(preferId = null) {
     .stats-table thead th { border-bottom:2px solid #555; }
     .table-wrap { overflow:auto; max-height:50vh; }
     .btn { padding:.3rem .6rem; }
+    .clear-btn { 
+      background-color: #ff4444;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    .clear-btn:hover {
+      background-color: #cc0000;
+    }
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid #eee;
+    }
     .linklike { background:none; border:none; padding:0; color:#6cf; cursor:pointer; text-decoration:underline; }
   `;
   document.head.appendChild(style);

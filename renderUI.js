@@ -321,13 +321,91 @@ function flashMsg(message, isError = false) {
 }
 
 function showWin() { 
-  $('winTime').textContent = fmtTime(state.elapsedMs); 
-  $('winMoves').textContent = state.moves; 
-  $('winScore').textContent = state.score;
-  $('winDifficulty').textContent = state.difficulty;
-  $('winSeed').textContent = state.seed;
-  $('winModal').style.display = 'grid'; 
-  burst(); 
+  const winModal = document.getElementById('winModal');
+  if (!winModal) return;
+
+  // Update basic game info
+  winModal.querySelector('#winTime').textContent = fmtTime(state.elapsedMs);
+  winModal.querySelector('#winMoves').textContent = state.moves;
+  winModal.querySelector('#winScore').textContent = state.score;
+  winModal.querySelector('#winDifficulty').textContent = state.difficulty;
+  winModal.querySelector('#winSeed').textContent = state.seed;
+
+  const winRateEl = winModal.querySelector('#winRate');
+  const winRateCountEl = winModal.querySelector('#winRateCount');
+  
+  // Default values
+  winRateEl.textContent = '0.0%';
+  winRateCountEl.textContent = '0 of 0';
+  
+  try {
+    console.log('Fetching win statistics...');
+    
+    // Check localStorage availability
+    if (typeof localStorage === 'undefined') {
+      throw new Error('localStorage is not available in this browser');
+    }
+    
+    // Get raw data from localStorage
+    const storageKey = 'spider.games.v3';
+    console.log(`Reading from localStorage key: ${storageKey}`);
+    const rawData = localStorage.getItem(storageKey);
+    
+    if (!rawData) {
+      console.log('No game data found in localStorage');
+      winRateEl.textContent = '0.0%';
+      winRateCountEl.textContent = '0 of 0';
+      return;
+    }
+    
+    console.log('Raw data from localStorage:', rawData.substring(0, 200) + '...');
+    
+    // Parse the data
+    let games;
+    try {
+      games = JSON.parse(rawData);
+      console.log(`Successfully parsed ${games.length} games`);
+    } catch (parseError) {
+      console.error('Failed to parse game data:', parseError);
+      throw new Error('Invalid game data format');
+    }
+    
+    if (!Array.isArray(games)) {
+      console.error('Game data is not an array:', typeof games);
+      throw new Error('Game data is not in expected format');
+    }
+    
+    // Calculate statistics
+    const totalGames = games.length;
+    const totalWins = games.filter(g => g && g.status === 'Won').length;
+    
+    console.log(`Stats - Total games: ${totalGames}, Wins: ${totalWins}`);
+    
+    // Update UI
+    if (totalGames > 0) {
+      const winPct = totalWins > 0 ? ((totalWins / totalGames) * 100).toFixed(1) : '0.0';
+      winRateEl.textContent = `${winPct}%`;
+      winRateCountEl.textContent = `${totalWins} of ${totalGames}`;
+      
+      // Make the win percentage more prominent
+      winRateEl.style.fontSize = '1.5em';
+      winRateEl.style.fontWeight = 'bold';
+      winRateCountEl.style.fontSize = '1em';
+      
+      console.log(`Displaying: ${winPct}% (${totalWins}/${totalGames})`);
+    } else {
+      console.log('No games found in the data');
+      winRateEl.textContent = '0.0%';
+      winRateCountEl.textContent = '0 of 0';
+    }
+  } catch (error) {
+    console.error('Error loading win statistics:', error);
+    winRateEl.textContent = 'Error';
+    winRateCountEl.textContent = 'Could not load stats';
+  } finally {
+    winModal.style.display = 'grid';
+    burst();
+  }
 }
 $('playAgain').onclick=()=>{ $('winModal').style.display='none'; newGame({ difficulty: state.difficulty, includeAces: state.includeAces }); };
 $('shareSeed').onclick=async()=>{ const url=new URL(location.href); url.searchParams.set('seed', state.seed); url.searchParams.set('difficulty', state.difficulty); try{ await navigator.clipboard.writeText(url.toString()); flashMsg('Link copied', false); }catch{ flashMsg('Failed to copy to clipboard. Here is the URL to share: ' + url.toString(), true); } };
@@ -391,11 +469,20 @@ $('hintModal').onclick = (e) => { if (e.target === $('hintModal')) { $('hintModa
 
 // ---- Stats UI ----
 function initStats() {
-  const showStatsBtn = $('showStats'); const closeBtn = $('closeStats'); const statsModal = $('statsModal');
+  const showStatsBtn = $('showStats'); 
+  const closeBtn = $('closeStats'); 
+  const clearBtn = $('clearStats');
+  const statsModal = $('statsModal');
+  
   if (showStatsBtn) showStatsBtn.onclick = showStatsV2;
+  
   if (closeBtn && statsModal) {
     closeBtn.onclick = () => { statsModal.style.display = 'none'; document.body.style.overflow = 'auto'; };
     statsModal.onclick = (e) => { if (e.target === statsModal) { statsModal.style.display = 'none'; document.body.style.overflow = 'auto'; } };
+  }
+  
+  if (clearBtn && window.GameHistory && typeof window.GameHistory.clearAll === 'function') {
+    clearBtn.onclick = () => window.GameHistory.clearAll();
   }
 }
 

@@ -12,7 +12,7 @@
   <div id="hud">
     <div id="top-bar">
       <div style="display: flex; gap: 15px; align-items: center;">
-        <div>David's Spider - v0.0.7</div>
+        <div>David's Spider - v0.0.8</div>
         <div>Time: <span id="time">0:00</span></div>
         <div>Moves: <span id="moves">0</span></div>
         <div>Score: <span id="score">500</span></div>
@@ -60,18 +60,19 @@
   <canvas id="game"></canvas>
 
   <div id="winModal" class="modal">
-    <div class="modal-content">
-      <h2>🦚 You Win!</h2>
-      <div class="win-stats">
+    <div class="modal-content" style="font-size: 1.5em;">
+      <h2 style="font-size: 2em; margin-bottom: 20px;">🦚 You Win!</h2>
+      <div class="win-stats" style="line-height: 1.8;">
         <div>Time: <b id="winTime">0:00</b></div>
         <div>Moves: <b id="winMoves">0</b></div>
         <div>Score: <b id="winScore">0</b></div>
         <div>Difficulty: <b id="winDifficulty">1-suit</b></div>
+        <div>Wins: <b id="winRate">-</b> (<span id="winRateCount">-</span> games)</div>
         <div>Seed: <b id="winSeed">abc123</b></div>
       </div>
-      <div class="modal-buttons">
-        <button id="playAgain">Play again</button>
-        <button id="shareSeed">Share seed</button>
+      <div class="modal-buttons" style="margin-top: 20px;">
+        <button id="playAgain" style="font-size: 0.9em; padding: 8px 16px;">Play again</button>
+        <button id="shareSeed" style="font-size: 0.9em; padding: 8px 16px;">Share seed</button>
       </div>
     </div>
   </div>
@@ -101,12 +102,13 @@
         </div>
       </div>
       <div class="modal-buttons">
+        <button id="clearStats" class="clear-btn">Clear All</button>
         <button id="closeStats">Close</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="renderUI.js"></script>
   <script src="history.js"></script>
+  <script type="module" src="renderUI.js"></script>
 </body>
 </html>

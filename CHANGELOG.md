@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.8] - 2025-10-18
+### Added
+- "Clear" button in the history panel to clear the history
+- Added a "Wins:" line to the You Win panel to show games won %
+
+### Changed
+- Incrased font size on the You Win panel
+
+
 ## [0.0.7] - 2025-09-08
 ### Added
 - New toast notification system for displaying messages to the user
