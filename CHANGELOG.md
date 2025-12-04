@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.9] - 2025-12-04
+### Added
+- Auto-start a new game on load using URL seed/difficulty so players land on a dealt layout immediately
+- Sidebar menu now uses a flexible layout that stretches buttons to fill the available height
+
+### Changed
+- Increased sidebar menu button font sizes (now ~20% larger than base buttons) for better readability
+- Refined sidebar spacing/scroll behavior to stay usable on smaller viewports
+
 ## [0.0.8] - 2025-10-18
 ### Added
 - "Clear" button in the history panel to clear the history
@@ -146,4 +155,3 @@
 ### Known Issues
 - Need to create MVP.md and dev_notes.txt
 - Default README.md
-

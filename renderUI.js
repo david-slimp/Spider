@@ -561,5 +561,7 @@ if (window.__hudClockInterval) { clearInterval(window.__hudClockInterval); delet
 initStats();
 startTick();
 requestAnimationFrame(draw);
-
+// Auto-start a game using URL params (or defaults) so players see a layout immediately
+$('seedInput').value = init.seed || '';
+newGame({ difficulty: init.difficulty, seed: init.seed, includeAces: $('includeAces').checked });
 
