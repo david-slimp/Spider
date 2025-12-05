@@ -4,6 +4,8 @@
 ### Changed
 - Cleaned up lint errors/warnings in core code (scoped column layout helper, removed debug logging, pruned unused helpers)
 - Configured ESLint to ignore draft files and audio assets for cleaner runs
+- Sidebar polish: added section labels/tooltips, improved hover/active/focus states for controls, and made toast notifications screen-reader friendly
+- Added top-bar Settings (gear) modal housing difficulty, include-aces, and mute controls to declutter the sidebar
 
 ## [0.0.9] - 2025-12-04
 ### Added

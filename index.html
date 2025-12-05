@@ -11,7 +11,7 @@
 <body>
   <div id="hud">
       <div id="top-bar">
-        <div style="display: flex; gap: 15px; align-items: center;">
+      <div style="display: flex; gap: 15px; align-items: center;">
         <div>David's Spider - v0.0.10</div>
         <div>Time: <span id="time">0:00</span></div>
         <div>Moves: <span id="moves">0</span></div>
@@ -21,42 +21,30 @@
         <div class="pill">Seed: <span id="seedLabel"></span></div>
       </div>
       <button id="showStats">📊 Stats</button>
+      <button id="showSettings" aria-label="Settings" title="Settings">⚙️</button>
     </div>
   </div>
 
   <div id="menu-bar">
     <div class="card menu-panel">
+      <div class="menu-section-title">Actions</div>
       <div class="menu-actions">
-        <button id="newBtn" title="N" style="width: 100%; text-align: left;">New Game</button>
-        <button id="replayBtn" title="Replay seed" style="width: 100%; text-align: left;">Replay</button>
-        <button id="undoBtn" title="U" style="width: 100%; text-align: left;">Undo</button>
-        <button id="redoBtn" title="R" style="width: 100%; text-align: left;">Redo</button>
-        <button id="hintBtn" title="H" style="width: 100%; text-align: left;">Hint</button>
-        <button id="dealBtn" title="D" style="width: 100%; text-align: left;">Deal</button>
+        <button id="newBtn" class="bubble-btn" data-label="New Game" title="N" style="width: 100%; text-align: left;">New Game</button>
+        <button id="replayBtn" class="bubble-btn" data-label="Replay" title="Replay seed" style="width: 100%; text-align: left;">Replay</button>
+        <button id="undoBtn" class="bubble-btn" data-label="Undo" title="U" style="width: 100%; text-align: left;">Undo</button>
+        <button id="redoBtn" class="bubble-btn" data-label="Redo" title="R" style="width: 100%; text-align: left;">Redo</button>
+        <button id="hintBtn" class="bubble-btn" data-label="Hint" title="H" style="width: 100%; text-align: left;">Hint</button>
+        <button id="dealBtn" class="bubble-btn" data-label="Deal" title="D" style="width: 100%; text-align: left;">Deal</button>
       </div>
 
-      <div class="menu-controls">
-        <select id="difficulty" style="width: 100%; padding: 6px; font-size: 0.9em;">
-          <option value="1-suit">1-suit</option>
-          <option value="2-suit" selected>2-suit</option>
-          <option value="4-suit">4-suit</option>
-        </select>
-
-        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.9em;">
-          <input type="checkbox" id="includeAces">
-          <span>Include Aces</span>
-        </label>
-
-        <div class="menu-seed-row">
-          <input id="seedInput" type="text" placeholder="custom seed" style="flex: 1; padding: 6px; font-size: 0.9em;"/>
-          <button id="setSeedBtn" style="padding: 0 8px;">Set</button>
-        </div>
+      <div class="menu-seed-row">
+        <input id="seedInput" type="text" placeholder="custom seed" style="flex: 1; padding: 6px; font-size: 0.9em;" title="Enter a custom seed to replay or share a game"/>
+        <button id="setSeedBtn" style="padding: 0 8px;" title="Apply custom seed">Set</button>
       </div>
 
       <div class="menu-footer">
         <div class="menu-footer-row">
-          <button id="muteBtn" style="flex: 1; padding: 6px;">🔊</button>
-          <button id="verifyBtn" title="Check deck & invariants" style="flex: 1; padding: 6px;">Verify</button>
+          <button id="verifyBtn" class="bubble-btn" data-label="Verify" title="Check deck & invariants" style="width: 100%; padding: 6px;">Verify</button>
         </div>
       </div>
     </div>
@@ -110,6 +98,37 @@
       <div class="modal-buttons">
         <button id="clearStats" class="clear-btn">Clear All</button>
         <button id="closeStats">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <h2>⚙️ Settings</h2>
+      <div class="stats-container">
+        <div class="stats-section">
+          <h3>Difficulty</h3>
+          <select id="difficulty" style="width: 100%; padding: 10px; font-size: 1em;">
+            <option value="1-suit">1-suit</option>
+            <option value="2-suit" selected>2-suit</option>
+            <option value="4-suit">4-suit</option>
+          </select>
+        </div>
+        <div class="stats-section">
+          <h3>Rules</h3>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 1em;">
+            <input type="checkbox" id="includeAces">
+            <span>Include Aces</span>
+          </label>
+        </div>
+        <div class="stats-section">
+          <h3>Audio</h3>
+          <button id="muteBtn" style="width: 100%; padding: 10px;">🔊 Toggle Sound</button>
+        </div>
+      </div>
+      <div class="modal-buttons">
+        <button id="closeSettings">Close</button>
       </div>
     </div>
   </div>

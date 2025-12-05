@@ -44,6 +44,21 @@ function ensureCanvasHeight(cssH) {
   if (cssH !== H) setCanvasSize(W, cssH);
 }
 
+function initBubbleButtons() {
+  const buttons = document.querySelectorAll('.bubble-btn');
+  const setTop = (btn) => {
+    const rect = btn.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    btn.style.setProperty('--bubble-top', `${midY}px`);
+  };
+  const setAll = () => buttons.forEach(setTop);
+  setAll();
+  buttons.forEach((btn) => {
+    btn.addEventListener('mouseenter', () => setTop(btn));
+    btn.addEventListener('focus', () => setTop(btn));
+  });
+  window.addEventListener('resize', setAll);
+}
 // ---- Layout ----
 function resize() { 
   // Base size in CSS px; we'll grow taller during draw() when needed
@@ -468,6 +483,21 @@ function initStats() {
   }
 }
 
+function initSettings() {
+  const settingsModal = $('settingsModal');
+  const showBtn = $('showSettings');
+  const closeBtn = $('closeSettings');
+
+  const open = () => { if (settingsModal) { settingsModal.style.display = 'flex'; } };
+  const close = () => { if (settingsModal) { settingsModal.style.display = 'none'; } };
+
+  if (showBtn) showBtn.onclick = open;
+  if (closeBtn) closeBtn.onclick = close;
+  if (settingsModal) {
+    settingsModal.onclick = (e) => { if (e.target === settingsModal) close(); };
+  }
+}
+
 // NEW: History-backed Stats entry point (keeps your modal & layout intact)
 function showStatsV2() {
   const statsModal = document.getElementById('statsModal');
@@ -541,6 +571,8 @@ resize();
 const init = initFromURL();
 if (window.__hudClockInterval) { clearInterval(window.__hudClockInterval); delete window.__hudClockInterval; }
 initStats();
+initSettings();
+initBubbleButtons();
 startTick();
 requestAnimationFrame(draw);
 // Auto-start a game using URL params (or defaults) so players see a layout immediately

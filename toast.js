@@ -21,6 +21,9 @@ function initToastContainer() {
     padding: '0 20px',
     boxSizing: 'border-box'
   });
+  toastContainer.setAttribute('role', 'status');
+  toastContainer.setAttribute('aria-live', 'polite');
+  toastContainer.setAttribute('aria-atomic', 'true');
   
   document.body.appendChild(toastContainer);
 }
