@@ -16,6 +16,7 @@
  * @private
  */
 if (typeof Howl === 'undefined' || typeof Howler === 'undefined') {
+  // eslint-disable-next-line no-console
   console.warn('[Audio] Howler.js not found. Include it before audio.js.');
 }
 

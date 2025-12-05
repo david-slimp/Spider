@@ -36,7 +36,7 @@
 
   function readGames() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-    catch (_) { return []; }
+    catch { return []; }
   }
   function writeGames(arr) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
@@ -355,7 +355,6 @@ function dedupeSeedDiff(preferId = null) {
   document.head.appendChild(style);
 
   // Clean up any pre-existing duplicates from older builds
-  try { dedupeSeedDiff(); } catch (_) {}
+  try { dedupeSeedDiff(); } catch {}
 
 })();
-

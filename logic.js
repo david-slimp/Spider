@@ -7,7 +7,6 @@
 /* global GameHistory */
 
 // ---- Utilities ----
-const clamp = (v,a,b)=>v<a?a:v>b?b:v;
 const now = ()=>performance.now();
 
 // --- Suits ---
@@ -30,7 +29,7 @@ export const hooks = {
     }
   },
   showWin: () => {},
-  showVerificationModal: (_data) => {},
+  showVerificationModal: () => {},
   audio: {
     blip: ()=>{}, click: ()=>{}, thud: ()=>{}, chord: ()=>{},
     setMuted: ()=>{}, isMuted: ()=>false, resume: ()=>{},
@@ -497,8 +496,6 @@ export function fmtTime(ms){ const s=Math.floor(ms/1000); const m=(s/60)|0; cons
 export function initFromURL(){ const url=new URL(location.href); const seed=url.searchParams.get('seed')||randSeed(); const diff=url.searchParams.get('difficulty')||'1-suit'; return {seed,difficulty:diff}; }
 
 // ---- Resume/Replay for History panel ----
-function cloneCard(c){ return c ? ({id:c.id,suit:c.suit,rank:c.rank,faceUp:!!c.faceUp}) : c; }
-function clonePile(p){ return Array.isArray(p) ? p.map(cloneCard) : []; }
 function canonDiffLabel(d){ return (d==='1'||d==='1-suit')?'1-suit':(d==='2'||d==='2-suit')?'2-suit':'4-suit'; }
 
 window.Game = window.Game || {};
@@ -544,4 +541,3 @@ window.Game.loadSnapshot = function (snap, meta) {
 window.Game.replaySeedDiff = function (seed, difficulty) {
   newGame({ seed: String(seed), difficulty: canonDiffLabel(difficulty), includeAces: state.includeAces });
 };
-

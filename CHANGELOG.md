@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.10] - 2025-12-05
+### Changed
+- Cleaned up lint errors/warnings in core code (scoped column layout helper, removed debug logging, pruned unused helpers)
+- Configured ESLint to ignore draft files and audio assets for cleaner runs
+
 ## [0.0.9] - 2025-12-04
 ### Added
 - Auto-start a new game on load using URL seed/difficulty so players land on a dealt layout immediately

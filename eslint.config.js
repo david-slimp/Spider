@@ -5,7 +5,7 @@ import globals from 'globals';
 export default [
   js.configs.recommended,
   {
-    ignores: ['node_modules/'],
+    ignores: ['node_modules/', 'drafts/**', 'audio/*.ogg'],
   },
   {
     files: ['**/*.js', '**/*.html'],

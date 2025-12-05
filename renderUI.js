@@ -21,8 +21,9 @@ const LAYOUT = {
 
 const canvas = $('game');
 const ctx = canvas.getContext('2d');
-let W = 0, H = 0, cardW = 96, cardH = 134, margin = 0, topArea = 140, overlapUp = 26, overlapDown = 32;
+let W = 0, H = 0, cardW = 96, cardH = 134, topArea = 140, overlapUp = 26, overlapDown = 32, gapSize = LAYOUT.COLUMN_MIN_GAP;
 const RED = new Set(['♥','♦']);
+const colX = (c) => LAYOUT.COLUMN_LEFT_PADDING + c * (cardW + gapSize);
 
 // --- HiDPI-aware canvas sizing helpers (keep drawing coords in CSS px) ---
 function dpr() { return window.devicePixelRatio || 1; }
@@ -56,17 +57,13 @@ function resize() {
   cardH = Math.floor(cardW * 1.4);
   
   // Update layout metrics
-  margin = 0;
   overlapUp = Math.max(20, Math.floor(cardH * 0.24));
   overlapDown = Math.max(24, Math.floor(cardH * 0.30));
   topArea = 90; // space for column numbers
   
   // Calculate column layout with equal spacing
   const totalGap = availableWidth - (LAYOUT.COLUMN_COUNT * cardW);
-  const gapSize = Math.max(LAYOUT.COLUMN_MIN_GAP, Math.floor(totalGap / (LAYOUT.COLUMN_COUNT - 1)));
-  
-  // Update the column position function
-  window.colX = c => LAYOUT.COLUMN_LEFT_PADDING + c * (cardW + gapSize);
+  gapSize = Math.max(LAYOUT.COLUMN_MIN_GAP, Math.floor(totalGap / (LAYOUT.COLUMN_COUNT - 1)));
   
   draw();
 }
@@ -339,8 +336,6 @@ function showWin() {
   winRateCountEl.textContent = '0 of 0';
   
   try {
-    console.log('Fetching win statistics...');
-    
     // Check localStorage availability
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available in this browser');
@@ -348,38 +343,29 @@ function showWin() {
     
     // Get raw data from localStorage
     const storageKey = 'spider.games.v3';
-    console.log(`Reading from localStorage key: ${storageKey}`);
     const rawData = localStorage.getItem(storageKey);
     
     if (!rawData) {
-      console.log('No game data found in localStorage');
       winRateEl.textContent = '0.0%';
       winRateCountEl.textContent = '0 of 0';
       return;
     }
     
-    console.log('Raw data from localStorage:', rawData.substring(0, 200) + '...');
-    
     // Parse the data
     let games;
     try {
       games = JSON.parse(rawData);
-      console.log(`Successfully parsed ${games.length} games`);
-    } catch (parseError) {
-      console.error('Failed to parse game data:', parseError);
+    } catch {
       throw new Error('Invalid game data format');
     }
     
     if (!Array.isArray(games)) {
-      console.error('Game data is not an array:', typeof games);
       throw new Error('Game data is not in expected format');
     }
     
     // Calculate statistics
     const totalGames = games.length;
     const totalWins = games.filter(g => g && g.status === 'Won').length;
-    
-    console.log(`Stats - Total games: ${totalGames}, Wins: ${totalWins}`);
     
     // Update UI
     if (totalGames > 0) {
@@ -391,15 +377,11 @@ function showWin() {
       winRateEl.style.fontSize = '1.5em';
       winRateEl.style.fontWeight = 'bold';
       winRateCountEl.style.fontSize = '1em';
-      
-      console.log(`Displaying: ${winPct}% (${totalWins}/${totalGames})`);
     } else {
-      console.log('No games found in the data');
       winRateEl.textContent = '0.0%';
       winRateCountEl.textContent = '0 of 0';
     }
-  } catch (error) {
-    console.error('Error loading win statistics:', error);
+  } catch {
     winRateEl.textContent = 'Error';
     winRateCountEl.textContent = 'Could not load stats';
   } finally {
@@ -564,4 +546,3 @@ requestAnimationFrame(draw);
 // Auto-start a game using URL params (or defaults) so players see a layout immediately
 $('seedInput').value = init.seed || '';
 newGame({ difficulty: init.difficulty, seed: init.seed, includeAces: $('includeAces').checked });
-
